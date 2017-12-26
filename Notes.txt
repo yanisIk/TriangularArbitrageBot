@@ -1,0 +1,39 @@
+AVOID EVENT LISTENERS MEMORY LEAK:
+    After each listener has done its job, remove its event handler from emitter
+    emitter.removeListener({{EventName}}, eventHandlerFunction);
+
+    https://www.npmjs.com/package/ultron
+
+BUY ORDER:
+{ OrderId: '583a3298-8cd7-41f9-a08c-a675b42d3917',
+  MarketName: 'BTC-ETH',
+  MarketCurrency: 'ETH',
+  BuyOrSell: 'Buy',
+  OrderType: 'LIMIT',
+  Quantity: 0.03393666,
+  Rate: 0.027986925 }
+
+  TEST: Manage partial quantities over time (how to get filled amount from the already partial field order)
+
+TODO: Manage outask when ask goes too low (compared to buy rate)
+sometimes, another bot will outask drastically and the ask will become same as what I bidded
+risks: waiting for ask to go back up ? => not seliing (DONE, slow trades)
+
+TODO URGENT:  NO REOUTASK AFTER ASK, HANG (happens during 2nd+ outask)
+--- NEW OPEN SELL ORDER [USDT-OMG] ---
+OrderID: 95fb4df3-3e60-4ca8-a78f-1bd235e72955
+Quantity:1.193387643525 @ Rate:16.715778797800002
+
+
+--- OUTASKED ORDER ---
+OrderID: 95fb4df3-3e60-4ca8-a78f-1bd235e72955
+Quantity:1.193387643525 @ Rate:16.715778797800002
+
+
+--- NEW OPEN CANCEL ORDER ---
+OrderID: 95fb4df3-3e60-4ca8-a78f-1bd235e72955
+
+
+TODO: Manage request timeouts for buy sell and cancel (Done but not sure if right strategy)
+
+
