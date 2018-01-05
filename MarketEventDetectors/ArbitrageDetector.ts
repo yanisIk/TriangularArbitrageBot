@@ -6,6 +6,7 @@ import IOrderEventEmitter from "../MarketDataEventEmitters/IOrderEventEmitter";
 import ITickEventEmitter from "../MarketDataEventEmitters/ITickEventEmitter";
 import Order, { OrderSide } from "../Models/Order";
 import Tick from "../Models/Tick";
+import TriangularArbitrage from "../Models/TriangularArbitrage";
 import OpenOrdersStatusDetector, { UPDATE_ORDER_STATUS_EVENTS } from "./OpenOrdersStatusDetector";
 
 type TickListener = (tick: Tick) => void;
@@ -57,10 +58,17 @@ export default class ArbitrageDetector extends EventEmitter {
             // lock analysis
             this.currentlyAnalysedMarket.set(tick.marketCurrency, true);
 
-            if (CONFIG.ARBITRAGE_MATRIX.BTC_ETH) {
-                this.detect_BTC_ETH_Arbitrage(tick.marketCurrency);
+            switch (CONFIG.PIVOT_MARKET) {
+                case "BTC-ETH":
+                    this.detect_BTC_ETH_Arbitrage(tick.marketCurrency);
+                    this.detect_ETH_BTC_Arbitrage(tick.marketCurrency);
+                case "BTC-USDT":
+                    this.detect_BTC_USDT_Arbitrage(tick.marketCurrency);
+                    this.detect_USDT_BTC_Arbitrage(tick.marketCurrency);
+                case "USDT-ETH":
+                    this.detect_USDT_ETH_Arbitrage(tick.marketCurrency);
+                    this.detect_ETH_USDT_Arbitrage(tick.marketCurrency);
             }
-
             // unlock analysis
             this.currentlyAnalysedMarket.delete(tick.marketCurrency);
         });
@@ -77,7 +85,7 @@ export default class ArbitrageDetector extends EventEmitter {
         let BTC_ETH_TICKER: Tick;
 
         // If one request throws an error, skip the coin and move on
-        [BTC_X_TICKER, ETH_X_TICKER, BTC_ETH_TICKER] = await Promise.all(["BTC-" + coin, "ETH-" + coin, "BTC-ETH"]
+        [BTC_X_TICKER, ETH_X_TICKER, BTC_ETH_TICKER] = await Promise.all([`BTC-${coin}`, `ETH-${coin}`, `BTC-ETH`]
                                                         .map((marketName) => this.getTickerPromise(marketName)));
 
         const BTC_X_BID = BTC_X_TICKER.bid;
@@ -93,28 +101,25 @@ export default class ArbitrageDetector extends EventEmitter {
         // if can buy X for COIN1, sell X for COIN2 and get more COIN1 when CONVERTING COIN2 
         // if COIN2 BID converted to COIN1 > value in COIN1 ASK
         // BUY X IN COIN1 -> SELL X IN COIN2 -> BUY/SELL COIN2 IN COIN1         
-        // 1 UNIT BUY IN COIN1 < 1 UNIT  
+        // 1 UNIT BUY IN COIN1 < 1 UNIT
 
         /**
          * BTC -> ETH -> BTC
          * BUY X WITH BTC -> SELL X FOR ETH -> SELL ETH FOR BTC
          */
         if ((ETH_X_BID * BTC_ETH_BID) > BTC_X_ASK) {
+
             const grossPercentageWin = ( ( ( ETH_X_BID * BTC_ETH_BID ) - BTC_X_ASK )  / BTC_X_ASK ) * 100;
-            const netPercentageWin = grossPercentageWin - CONFIG.BITTREX_TRIANGULAR_ARBITRAGE_PERCENTAGE_FEE; 
-
-            // if (CONFIG.IS_DETECTOR_LOG_ACTIVE) console.log(`\n WORKER#${WORKER_ID} : ---------- BTC-${coin} -> ETH-${coin} -> BTC-ETH  +${grossPercentageWin.toFixed(4)}% gross  -------------  \n`);
-
-            if (netPercentageWin < CONFIG.MIN_NET_PROFIT_PERCENTAGE) {
+            if (grossPercentageWin < CONFIG.MIN_PROFIT_PERCENTAGE) {
                 return;
             }
-            
-            //Calculate quantity to buy
+
+            // TODO: CONTINUE HERE
+            // Calculate quantity to buy
             const qtyToBuyInCOIN = CONFIG.MIN_QTY_TO_TRADE["BTC-"+coin];
             const qtyToBuyInBTC = qtyToBuyInCOIN * BTC_X_ASK;
 
-            const grossBTCWin = qtyToBuyInBTC * (grossPercentageWin/100);
-            const netBTCWin = qtyToBuyInBTC * (netPercentageWin/100);
+            // Generate quotes
 
             const opportunity = {
                 id: Date.now(), 
@@ -132,10 +137,6 @@ export default class ArbitrageDetector extends EventEmitter {
                 potentialGrossBasecoinWin: grossBTCWin,
                 potentialNetBasecoinWin: netBTCWin
             }
-
-            this.counter++;
-
-            if (CONFIG.IS_DETECTOR_LOG_ACTIVE) console.log(`\n WORKER#${WORKER_ID} : ---------- ARBITRAGE OPPORTUNITY (${this.counter}) : BTC-${opportunity.coin} -> ETH-${opportunity.coin} -> BTC-ETH +${opportunity.potentialNetPercentageWin.toFixed(4)}%  (ID: ${opportunity.id}) -------------  \n`)
 
             return opportunity;
         }
