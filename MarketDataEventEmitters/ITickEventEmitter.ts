@@ -21,4 +21,6 @@ export default interface ITickEventEmitter extends EventEmitter {
      * Implementation is dependent on the exchange adapter
      */
     unsubscribe(marketName: string): void;
+
+    getTicker(marketName: string): Promise<Tick>;
 }

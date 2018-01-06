@@ -11,6 +11,10 @@ import Order, { OrderSide, OrderStatus } from "./../Models/Order";
  */
 export default class OpenOrdersStatusDetector extends EventEmitter {
 
+    public readonly FILLED_ORDER_EVENT_EMITTER: EventEmitter = new EventEmitter();
+    public readonly PARTIALLY_FILLED_ORDER_EVENT_EMITTER: EventEmitter = new EventEmitter();
+    public readonly CANCELED_ORDER_EVENT_EMITTER: EventEmitter = new EventEmitter();
+
     public readonly FILLED_BUY_ORDER_EVENT_EMITTER: EventEmitter = new EventEmitter();
     public readonly PARTIALLY_FILLED_BUY_ORDER_EVENT_EMITTER: EventEmitter = new EventEmitter();
     public readonly CANCELED_BUY_ORDER_EVENT_EMITTER: EventEmitter = new EventEmitter();
@@ -20,8 +24,7 @@ export default class OpenOrdersStatusDetector extends EventEmitter {
 
     private readonly lastPartialOrders: Map<string, Order> = new Map();
 
-    constructor(private broker: IBroker,
-                private watchIntervalInMs: number) {
+    constructor(private broker: IBroker) {
         super();
         this.startWatch();
         if (CONFIG.GLOBAL.IS_LOG_ACTIVE) {
@@ -77,7 +80,7 @@ export default class OpenOrdersStatusDetector extends EventEmitter {
                     // console.error(err);
                     tryCheckOrder();
                 });
-            }, firstTime ? 0 : this.watchIntervalInMs);
+            }, firstTime ? 0 : CONFIG.BITTREX.ORDER_WATCH_INTERVAL_IN_MS);
         };
 
         tryCheckOrder(true);
@@ -93,6 +96,7 @@ export default class OpenOrdersStatusDetector extends EventEmitter {
 
         // CANCELED ORDERS
         if (updatedOrder.status === OrderStatus.CANCELED) {
+            this.CANCELED_ORDER_EVENT_EMITTER.emit(updatedOrder.id, updatedOrder);
             if (updatedOrder.side === OrderSide.BUY) {
                 this.CANCELED_BUY_ORDER_EVENT_EMITTER.emit(updatedOrder.id, updatedOrder);
                 this.emit(UPDATE_ORDER_STATUS_EVENTS.CANCELED_BUY_ORDER, updatedOrder);
@@ -126,6 +130,9 @@ export default class OpenOrdersStatusDetector extends EventEmitter {
         if (lastPartialOrder) {
             updatedOrder.partialFill = updatedOrder.quantityFilled - lastPartialOrder.quantityFilled;
         }
+
+        this.FILLED_ORDER_EVENT_EMITTER.emit(updatedOrder.id, updatedOrder);
+
         if (updatedOrder.side === OrderSide.BUY) {
             this.FILLED_BUY_ORDER_EVENT_EMITTER.emit(updatedOrder.id, updatedOrder);
             this.emit(UPDATE_ORDER_STATUS_EVENTS.FILLED_BUY_ORDER, updatedOrder);
@@ -170,12 +177,15 @@ export default class OpenOrdersStatusDetector extends EventEmitter {
 
         this.lastPartialOrders.set(updatedOrder.id, updatedOrder);
 
+        this.PARTIALLY_FILLED_ORDER_EVENT_EMITTER.emit(updatedOrder.id, updatedOrder);
+
         if (updatedOrder.side === OrderSide.BUY) {
+            this.PARTIALLY_FILLED_BUY_ORDER_EVENT_EMITTER.emit(updatedOrder.id, updatedOrder);
             this.FILLED_BUY_ORDER_EVENT_EMITTER.emit(updatedOrder.id, updatedOrder);
             this.emit(UPDATE_ORDER_STATUS_EVENTS.PARTIALLY_FILLED_BUY_ORDER, updatedOrder);
         }
         if (updatedOrder.side === OrderSide.SELL) {
-            this.FILLED_SELL_ORDER_EVENT_EMITTER.emit(updatedOrder.id, updatedOrder);
+            this.PARTIALLY_FILLED_SELL_ORDER_EVENT_EMITTER.emit(updatedOrder.id, updatedOrder);
             this.emit(UPDATE_ORDER_STATUS_EVENTS.PARTIALLY_FILLED_SELL_ORDER, updatedOrder);
         }
     }

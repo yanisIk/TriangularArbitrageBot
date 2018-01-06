@@ -1,11 +1,12 @@
 import { EventEmitter } from "events";
 import Order from "./../Models/Order";
+import OrderBook from "./../Models/OrderBook";
 
 /**
- * Market orders stream for a market
- * Emits: "BUY_ORDER" and "SELL_ORDER"
+ * order book stream for a market
+ * Emits OrderBook
  */
-export default interface IOrderEventEmitter extends EventEmitter {
+export default interface IOrderBookEventEmitter extends EventEmitter {
     /**
      * Subscribe to orders and emit them
      * Implementation is dependent on the exchanger adapter
@@ -16,9 +17,6 @@ export default interface IOrderEventEmitter extends EventEmitter {
      * Implementation is dependent on the exchanger adapter
      */
     unsubscribe(marketName: string): void;
-}
 
-export enum ORDER_EVENT_TYPE {
-    BUY_ORDER,
-    SELL_ORDER,
+    getOrderBook(marketName: string): Promise<OrderBook>;
 }

@@ -5,7 +5,7 @@ import * as dotenv from "dotenv-safe";
 dotenv.load();
 import * as _ from "lodash";
 import * as CONFIG from "./Config/CONFIG";
-import BittrexMarketMakerBot from "./Engines/BittrexMarketMakerBot";
+import BittrexTriangularArbitrageBot from "./Engines/BittrexTriangularArbitrageBot";
 // import BittrexExchangeService from "./Services/BittrexExchangeService";
 
 const numWorkers: number = 1; // require('os').cpus().length;
@@ -41,7 +41,7 @@ if (cluster.isMaster) {
 
         for (let i = 0; i < numWorkers; i++) {
             const worker = cluster.fork();
-            worker.send({workerId: i, marketName: CONFIG.BITTREX.MARKETS_TO_MONITOR[i]});
+            worker.send({workerId: i, marketName: CONFIG.BITTREX.PIVOT_CURRENCIES[i]});
         }
     }
 
@@ -56,8 +56,8 @@ if (cluster.isMaster) {
         console.log(`WORKER#${data.workerId} MONITORING ${data.marketName}`);
 
         try {
-            const bittrexMarketMakerBot = new BittrexMarketMakerBot(data.marketName);
-            bittrexMarketMakerBot.start();
+            const bittrexTriangularArbitrageBot = new BittrexTriangularArbitrageBot(data.marketName);
+            bittrexTriangularArbitrageBot.start();
         } catch (err) {
             console.error(err);
         }

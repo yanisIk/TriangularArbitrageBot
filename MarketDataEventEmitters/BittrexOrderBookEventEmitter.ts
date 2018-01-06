@@ -1,9 +1,11 @@
 import * as Bluebird from "bluebird";
 import { EventEmitter } from "events";
 import { setInterval } from "timers";
-import Tick from "../Models/Tick";
+import Order from "../Models/Order";
+import OrderBook from "../Models/OrderBook";
 import * as CONFIG from "./../Config/CONFIG";
-import ITickEventEmitter from "./ITickEventEmitter";
+import IOrderBookEventEmitter from "./IOrderBookEventEmitter";
+
 
 const bittrexClient = require("../../CustomExchangeClients/node-bittrex-api");
 const bittrex = Bluebird.promisifyAll(bittrexClient);
@@ -14,9 +16,9 @@ bittrex.options({
     inverse_callback_arguments : true,
 });
 
-export default class BittrexTickEventEmitter extends EventEmitter implements ITickEventEmitter {
+export default class BittrexOrderBookEventEmitter extends EventEmitter implements IOrderBookEventEmitter {
 
-    public readonly ticks: Map<string, Tick> = new Map();
+    public readonly orderBooks: Map<string, OrderBook> = new Map();
     // Contains the setInterval ids for polling
     // Key: marketName, Value: intervalId
     private readonly pollingIntervalIds: Map<string, any> = new Map();
@@ -26,16 +28,16 @@ export default class BittrexTickEventEmitter extends EventEmitter implements ITi
     }
 
     /**
-     * Polling strategy with CONFIG.BITTREX_TICK_POLL_INTERVAL_IN_MS
+     * Polling strategy with CONFIG.BITTREX_ORDERBOOK_POLL_INTERVAL_IN_MS
      * @param marketName
      */
     public subscribe(marketName: string) {
         const intervalId = setInterval(async () => {
-            const tick: Tick = await this.getTicker(marketName);
-            if (tick) {
-                this.emit(marketName, tick);
+            const orderBook: OrderBook = await this.getOrderBook(marketName);
+            if (orderBook) {
+                this.emit(marketName, orderBook);
             }
-        }, CONFIG.BITTREX.TICK_POLL_INTERVAL_IN_MS);
+        }, CONFIG.BITTREX.ORDERBOOK_POLL_INTERVAL_IN_MS);
         this.pollingIntervalIds.set(marketName, intervalId);
     }
 
@@ -43,18 +45,18 @@ export default class BittrexTickEventEmitter extends EventEmitter implements ITi
         clearInterval(this.pollingIntervalIds.get(marketName));
     }
 
-    public async getTicker(marketName: string): Promise<Tick> {
+    public async getOrderBook(marketName: string): Promise<OrderBook> {
         try {
-            const ticker = await bittrex.gettickerAsync({market: marketName})
-            if (!ticker.result) {
-                throw new Error(ticker.message);
+            const orderBook = await bittrex.getorderbookAsync({market: marketName})
+            if (!orderBook.result) {
+                throw new Error(orderBook.message);
             }
-            return new Tick(marketName, ticker.result.Bid, ticker.result.Ask, ticker.result.Last);
+            return new OrderBook(marketName, orderBook.bids, orderBook.asks);
         } catch (err) {
             if (err.message === "URL request error") {
                 return;
             }
-            console.error(`!!! ERROR IN GETTICKER() !!!`);
+            console.error(`!!! ERROR IN GETORDERBOOK() !!!`);
             console.error(err);
         }
     }
