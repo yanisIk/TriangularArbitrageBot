@@ -16,6 +16,9 @@ import { EventEmitter } from "events";
 
 export default class TriangularArbitrageHandler extends EventEmitter {
 
+    public static readonly OPEN_TRIANGLE_EVENT: string = "OPENED_TRIANGLE";
+    public static readonly CLOSE_TRIANGLE_EVENT: string = "CLOSED_TRIANGLE";
+
     public readonly currentlyOpenedTriangles: Map<string, TriangularArbitrage> = new Map();
 
     constructor(private triangularTriangularArbitrageDetector: TriangularArbitrageDetector,
@@ -39,23 +42,34 @@ export default class TriangularArbitrageHandler extends EventEmitter {
         // Send orders
         const buyOrderPromise = this.broker.buy(triangularArbitrage.buyQuote);
         const sellOrderPromise = this.broker.sell(triangularArbitrage.sellQuote);
-        const convertOrderPromise = triangularArbitrage.convertQuote.side === OrderSide.BUY ? 
+        const convertOrderPromise = triangularArbitrage.convertQuote.side === OrderSide.BUY ?
             this.broker.buy(triangularArbitrage.convertQuote) : this.broker.sell(triangularArbitrage.convertQuote);
-        
+
         // Update triangle
-        let buyOrder: Order, sellOrder: Order, convertOrder: Order;
-        [buyOrder, sellOrder, convertOrder] = await Promise.all([buyOrderPromise, sellOrderPromise, convertOrderPromise]);
+        let buyOrder: Order;
+        let sellOrder: Order;
+        let convertOrder: Order;
+
+        [buyOrder, sellOrder, convertOrder] = await Promise.all
+                                            ([buyOrderPromise, sellOrderPromise, convertOrderPromise]);
         triangularArbitrage.open(buyOrder, sellOrder, convertOrder);
 
         this.currentlyOpenedTriangles.set(triangularArbitrage.triangle, triangularArbitrage);
+        this.emit(TriangularArbitrageHandler.OPEN_TRIANGLE_EVENT, triangularArbitrage);
 
         // watch orders
-        let filledBuyOrderPromise: Promise<Order>, filledSellOrderPromise: Promise<Order>, filledConverPromisetOrderPromise: Promise<Order>;
-        let filledBuyOrder: Order, filledSellOrder: Order, filledConvertOrder: Order;
+        const filledBuyOrderPromise: Promise<Order> = this.getFilledOrderPromise(buyOrder.id);
+        const filledSellOrderPromise: Promise<Order> = this.getFilledOrderPromise(sellOrder.id);
+        const filledConverPromisetOrderPromise: Promise<Order> = this.getFilledOrderPromise(convertOrder.id);
+
+        let filledBuyOrder: Order;
+        let filledSellOrder: Order;
+        let filledConvertOrder: Order;
+
         const AllFilledOrdersPromise = Promise.all([
-                                                    this.getFilledOrderPromise(buyOrder.id),
-                                                    this.getFilledOrderPromise(sellOrder.id),
-                                                    this.getFilledOrderPromise(convertOrder.id)
+                                                    filledBuyOrderPromise,
+                                                    filledSellOrderPromise,
+                                                    filledConverPromisetOrderPromise,
                                                 ]);
         // TODO: SWITCH ORDERS WHEN NEW ORDER TO REPLACE UNFILLED
         // let cleanListeners: () => void;
@@ -78,13 +92,13 @@ export default class TriangularArbitrageHandler extends EventEmitter {
         //     this.unfilledOrderHandler.REPLACE_ORDER_EVENTS.removeListener(sellOrder.id, sellOrderListener);
         //     this.unfilledOrderHandler.REPLACE_ORDER_EVENTS.removeListener(convertOrder.id, convertOrderListener);
         // }
-        
-        [filledBuyOrder, filledSellOrder, filledConvertOrder] = await AllFilledOrdersPromise;
-        
-        triangularArbitrage.close(filledBuyOrder, filledSellOrder, filledConvertOrder);
-        
-        this.currentlyOpenedTriangles.delete(triangularArbitrage.triangle);
 
+        [filledBuyOrder, filledSellOrder, filledConvertOrder] = await AllFilledOrdersPromise;
+
+        triangularArbitrage.close(filledBuyOrder, filledSellOrder, filledConvertOrder);
+
+        this.currentlyOpenedTriangles.delete(triangularArbitrage.triangle);
+        this.emit(TriangularArbitrageHandler.CLOSE_TRIANGLE_EVENT, triangularArbitrage);
     }
 
     private getFilledOrderPromise(orderId: string): Promise<Order> {

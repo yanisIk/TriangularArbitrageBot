@@ -3,26 +3,27 @@ import IBroker, { OPEN_ORDER_EVENTS } from "../Brokers/IBroker";
 
 import * as CONFIG from "../Config/CONFIG";
 
-import BittrexTickEventEmitter from "../MarketDataEventEmitters/BittrexTickEventEmitter";
 import BittrexOrderBookEventEmitter from "../MarketDataEventEmitters/BittrexOrderBookEventEmitter";
+import BittrexTickEventEmitter from "../MarketDataEventEmitters/BittrexTickEventEmitter";
+import IOrderBookEventEmitter from "../MarketDataEventEmitters/IOrderBookEventEmitter";
 import ITickEventEmitter from "../MarketDataEventEmitters/ITickEventEmitter";
-import IOrderBookEventEmitter from "./../MarketDataEventEmitters/IOrderBookEventEmitter";
+import BittrexAccountManager from "../Services/BittrexAccountManager";
+import IAccountManager from "../Services/IAccountManager";
 
 import OpenOrdersStatusDetector from "../MarketEventDetectors/OpenOrdersStatusDetector";
-
-import { OrderSide, OrderTimeEffect, OrderType } from "../Models/Order";
-import Quote from "../Models/Quote";
-import Tick from "../Models/Tick";
-import OrderLogger from "../Services/OrdersLogger";
 import TriangularArbitrageDetector from "../MarketEventDetectors/TriangularArbitrageDetector";
 import UnfilleddOrdersDetector from "../MarketEventDetectors/UnfilledOrdersDetector";
 import TriangularArbitrageHandler from "../MarketEventHandlers/TriangularArbitrageHandler";
 import UnfilledOrderHandler from "../MarketEventHandlers/UnfilledOrderHandler";
 
-
+import { OrderSide, OrderTimeEffect, OrderType } from "../Models/Order";
+import Quote from "../Models/Quote";
+import Tick from "../Models/Tick";
+import OrderLogger from "../Services/OrdersLogger";
 
 export default class BittrexTriangularArbitrageBot {
 
+    private accountManager: BittrexAccountManager;
     private broker: IBroker;
 
     private tickEmitter: ITickEventEmitter;
@@ -35,10 +36,13 @@ export default class BittrexTriangularArbitrageBot {
     private triangularArbitrageHandler: TriangularArbitrageHandler;
     private unfilledOrderHandler: UnfilledOrderHandler;
 
-
     private orderLogger: OrderLogger;
 
     constructor(public readonly marketName: string) {
+        // console.log("CHECKING BALANCES...");
+        // this.checkBalances();
+        this.accountManager = new BittrexAccountManager();
+
         console.log("SETTING UP EVENTS PIPELINES...");
         this.setUpPipeline();
         console.log("EVENTS PIPELINES READY");
@@ -55,11 +59,14 @@ export default class BittrexTriangularArbitrageBot {
         this.orderBookEmitter = new BittrexOrderBookEventEmitter();
 
         this.openOrdersStatusDetector = new OpenOrdersStatusDetector(this.broker);
-        this.triangularArbitrageDetector = new TriangularArbitrageDetector(this.broker, this.openOrdersStatusDetector, this.tickEmitter, this.orderBookEmitter);
+        this.triangularArbitrageDetector = new TriangularArbitrageDetector
+            (this.broker, this.accountManager, this.openOrdersStatusDetector, this.tickEmitter, this.orderBookEmitter);
         this.unfilledOrdersDetector = new UnfilleddOrdersDetector(this.broker, this.openOrdersStatusDetector);
 
-        this.triangularArbitrageHandler = new TriangularArbitrageHandler(this.triangularArbitrageDetector, this.openOrdersStatusDetector, this.broker);
-        this.unfilledOrderHandler = new UnfilledOrderHandler(this.unfilledOrdersDetector, this.openOrdersStatusDetector, this.broker, this.tickEmitter);
+        this.triangularArbitrageHandler = new TriangularArbitrageHandler
+                                    (this.triangularArbitrageDetector, this.openOrdersStatusDetector, this.broker);
+        this.unfilledOrderHandler = new UnfilledOrderHandler
+                            (this.unfilledOrdersDetector, this.openOrdersStatusDetector, this.broker, this.tickEmitter);
 
         // this.orderLogger = new OrderLogger(this.openOrdersStatusDetector);
 
@@ -69,18 +76,33 @@ export default class BittrexTriangularArbitrageBot {
 
         console.log("STARTING !");
 
-        // Loop through coins
+        // Loop through coins and detect triangular arbitrage
         let i = 0;
         setInterval(() => {
             // emit
             if (i >= CONFIG.BITTREX.PIVOT_CURRENCIES.length) {
                 i = 0;
-            } 
+            }
             this.triangularArbitrageDetector.detect(CONFIG.BITTREX.PIVOT_CURRENCIES[i]);
             i++;
-        }, 1000)
+        }, 1000);
+    }
 
-        // Send event to arbitrage detector
+    /**
+     * TODO
+     * Checks if balance is as following:
+     *  1x PIVOT MARKET
+     *  1x EACH PIVOT COIN
+     */
+    private async checkBalances() {
+        const balances: Map<string, number> = await this.accountManager.getBalances();
+        const pivotCoins: string[] = CONFIG.BITTREX.PIVOT_CURRENCIES;
+        let baseCoin: string;
+        let convertCoin: string;
+        [baseCoin, convertCoin] = CONFIG.BITTREX.PIVOT_MARKET.split("-");
+
+        const baseCoinQty = balances.get(baseCoin);
+        const convertCoinQty = balances.get(convertCoin);
 
     }
 }
