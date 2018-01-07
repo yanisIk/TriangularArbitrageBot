@@ -25,7 +25,7 @@ export default class UnfilledOrderHandler {
 
     private startMonitoring(): void {
         this.unfilledOrderDetector.on(UnfilleddOrdersDetector.UNFILLED_ORDER_EVENT, async (order: Order) => {
-            
+
             let canceledOrder: Order, newOrder: Order; 
             try {
                 await this.broker.cancelOrder(order.id);

@@ -1,4 +1,4 @@
-declare const CONFIG;
+import * as CONFIG from "./../Config/CONFIG";
 
 import { EventEmitter } from "events";
 import IBroker, { OPEN_ORDER_EVENTS } from "../Brokers/IBroker";
@@ -54,11 +54,19 @@ export default class TriangularArbitrageDetector extends EventEmitter {
             }
             // lock analysis
             this.currentlyAnalysedMarket.set(currency, true);
-            const balances = await this.accountManager.getBalances();
+            let balances: Map<string, number>;
 
-            switch (CONFIG.PIVOT_MARKET) {
+            // try {
+            //     balances = await this.accountManager.getBalances();
+            // } catch (ex) {
+            //     // unlock analysis
+            //     this.currentlyAnalysedMarket.delete(currency);
+            //     return;
+            // }
+
+            switch (CONFIG.BITTREX.PIVOT_MARKET) {
                 case "BTC-ETH":
-                    this.detect_BTC_ETH_Arbitrage(currency, balances);
+                    await this.detect_BTC_ETH_Arbitrage(currency, balances);
                 //     this.detect_ETH_BTC_Arbitrage(tick.marketCurrency);
                 // case "BTC-USDT":
                 //     this.detect_BTC_USDT_Arbitrage(tick.marketCurrency);
@@ -91,9 +99,9 @@ export default class TriangularArbitrageDetector extends EventEmitter {
             this.currentlyAnalysedMarket.set(tick.marketCurrency, true);
             const balances = await this.accountManager.getBalances();
 
-            switch (CONFIG.PIVOT_MARKET) {
+            switch (CONFIG.BITTREX.PIVOT_MARKET) {
                 case "BTC-ETH":
-                    this.detect_BTC_ETH_Arbitrage(tick.marketCurrency, balances);
+                    await this.detect_BTC_ETH_Arbitrage(tick.marketCurrency, balances);
                 //     this.detect_ETH_BTC_Arbitrage(tick.marketCurrency);
                 // case "BTC-USDT":
                 //     this.detect_BTC_USDT_Arbitrage(tick.marketCurrency);
@@ -111,25 +119,63 @@ export default class TriangularArbitrageDetector extends EventEmitter {
      * BTC -> ETH -> BTC
      * BUY X WITH BTC -> SELL X FOR ETH -> SELL ETH FOR BTC
      */
-    private async detect_BTC_ETH_Arbitrage(coin: string, balances: Map<string, number>) {
+    private async detect_BTC_ETH_Arbitrage(coin: string, balances: Map<string, number>): Promise<void> {
 
         let BTC_X_ORDERBOOK: OrderBook;
         let ETH_X_ORDERBOOK: OrderBook;
         let BTC_ETH_ORDERBOOK: OrderBook;
 
-        // If one request throws an error, skip the coin and move on
-        [BTC_X_ORDERBOOK, ETH_X_ORDERBOOK, BTC_ETH_ORDERBOOK] =
-                                        await Promise.all([`BTC-${coin}`, `ETH-${coin}`, `BTC-ETH`]
-                                                        .map((marketName) => this.getOrderBook(marketName)));
+        try {
+            // If one request throws an error, skip the coin and move on
+            [BTC_X_ORDERBOOK, ETH_X_ORDERBOOK, BTC_ETH_ORDERBOOK] =
+            await Promise.all([`BTC-${coin}`, `ETH-${coin}`, `BTC-ETH`]
+                            .map((marketName) => this.getOrderBook(marketName)));
 
-        const BTC_X_ASK = BTC_X_ORDERBOOK.asks[0].rate;
-        const BTC_X_QTY = BTC_X_ORDERBOOK.asks[0].quantity;
+        } catch (ex) {
+            console.error(`ORDERBOOK RECEPTION ERROR, SKIPPING DETECTION ${coin}`);
+            if (ex.message !== "URL request error") {
+                console.error(ex);
+            }
+            return;
+        }
 
-        const ETH_X_BID = ETH_X_ORDERBOOK.bids[0].rate;
-        const ETH_X_QTY = ETH_X_ORDERBOOK.bids[0].quantity;
+        if (!BTC_X_ORDERBOOK.bids || !BTC_X_ORDERBOOK.asks ||
+            !ETH_X_ORDERBOOK.bids || !ETH_X_ORDERBOOK.asks ||
+            !BTC_ETH_ORDERBOOK.bids || !BTC_ETH_ORDERBOOK.asks) {
+                console.error("!!! CORRUPTED ORDERBOOK 1!!!");
+                return;
+        }
 
-        const BTC_ETH_BID = BTC_ETH_ORDERBOOK.bids[0].rate;
-        const BTC_ETH_QTY = BTC_ETH_ORDERBOOK.bids[0].quantity;
+        if (!BTC_X_ORDERBOOK.bids[0] || !BTC_X_ORDERBOOK.asks[0] ||
+            !ETH_X_ORDERBOOK.bids[0] || !ETH_X_ORDERBOOK.asks[0] ||
+            !BTC_ETH_ORDERBOOK.bids[0] || !BTC_ETH_ORDERBOOK.asks[0]) {
+                console.error("!!! CORRUPTED ORDERBOOK 2!!!");
+                return;
+        }
+
+        let BTC_X_BID = BTC_X_ORDERBOOK.bids[0].Rate;
+        let BTC_X_ASK = BTC_X_ORDERBOOK.asks[0].Rate;
+        let BTC_X_ASK_QTY = BTC_X_ORDERBOOK.asks[0].Quantity;
+        let BTC_X_BID_QTY = BTC_X_ORDERBOOK.bids[0].Quantity;
+
+        let ETH_X_BID = ETH_X_ORDERBOOK.bids[0].Rate;
+        let ETH_X_ASK = ETH_X_ORDERBOOK.asks[0].Rate;
+        let ETH_X_BID_QTY = ETH_X_ORDERBOOK.bids[0].Quantity;
+        let ETH_X_ASK_QTY = ETH_X_ORDERBOOK.asks[0].Quantity;
+
+        let BTC_ETH_BID = BTC_ETH_ORDERBOOK.bids[0].Rate;
+        let BTC_ETH_ASK = BTC_ETH_ORDERBOOK.asks[0].Rate;
+        let BTC_ETH_BID_QTY = BTC_ETH_ORDERBOOK.bids[0].Quantity;
+        let BTC_ETH_ASK_QTY = BTC_ETH_ORDERBOOK.asks[0].Quantity;
+
+        // if ( (BTC_X_ASK_QTY * BTC_X_ASK) < CONFIG.BITTREX.MIN_BTC_QUANTITY ||
+        //      (BTC_X_BID_QTY * BTC_X_BID) < CONFIG.BITTREX.MIN_BTC_QUANTITY ||
+        //      (ETH_X_ASK_QTY * ETH_X_ASK) < CONFIG.BITTREX.MIN_ETH_QUANTITY ||
+        //      (ETH_X_BID_QTY * ETH_X_BID) < CONFIG.BITTREX.MIN_ETH_QUANTITY
+        //     ) {
+        //         console.log(`!!! QUANTITIES TOO LOW IN BIDS & ASKS !!!`);
+        //         return;
+        // }
 
         // FORMULA:  COIN1 -> COIN2 -> COIN1
         // if can buy X for COIN1, sell X for COIN2 and get more COIN1 when CONVERTING COIN2
@@ -141,49 +187,126 @@ export default class TriangularArbitrageDetector extends EventEmitter {
          * BTC -> ETH -> BTC
          * BUY X WITH BTC -> SELL X FOR ETH -> SELL ETH FOR BTC
          */
-        if ((ETH_X_BID * BTC_ETH_BID) > BTC_X_ASK) {
+        const btcTrianglePercentageProfit = ( (ETH_X_BID / BTC_X_ASK) * BTC_ETH_BID - 1 ) * 100;
+        const ethTrianglePercentageProfit = ( (BTC_X_BID / ETH_X_ASK) / BTC_ETH_ASK - 1 ) * 100;
+        // console.log(`BTC Triangle: ${btcTrianglePercentageProfit}%`);
+        // console.log(`ETH Triangle: ${ethTrianglePercentageProfit}%`);
+        if (btcTrianglePercentageProfit > CONFIG.BITTREX.MIN_PROFIT_PERCENTAGE) {
 
-            const grossPercentageWin = ( ( ( ETH_X_BID * BTC_ETH_BID ) - BTC_X_ASK )  / BTC_X_ASK ) * 100;
-            if (grossPercentageWin < CONFIG.MIN_PROFIT_PERCENTAGE) {
-                return;
-            }
+            // Test
+            // console.log(`[BTC-${coin}] \n` +
+            // `Bid: ${JSON.stringify(BTC_X_ORDERBOOK.bids[0])} \n` +
+            // `Ask: ${JSON.stringify(BTC_X_ORDERBOOK.asks[0])}`);
+            // console.log(`[ETH-${coin}] \n` +
+            // `Bid: ${JSON.stringify(ETH_X_ORDERBOOK.bids[0])} \n` +
+            // `Ask: ${JSON.stringify(ETH_X_ORDERBOOK.asks[0])}`);
+            // console.log(`[BTC-ETH] \n` +
+            // `Bid: ${JSON.stringify(BTC_ETH_ORDERBOOK.bids[0])} \n` +
+            // `Ask: ${JSON.stringify(BTC_ETH_ORDERBOOK.asks[0])}`);
 
             // Calculate X quantity to arbitrage
-            let maxQtyToArbitrage: number = BTC_X_QTY < ETH_X_QTY ? BTC_X_QTY : ETH_X_QTY;
-            const maxQtyToConvert: number = BTC_ETH_QTY * ETH_X_BID;
+            let maxQtyToArbitrage: number = BTC_X_ASK_QTY < ETH_X_BID_QTY ? BTC_X_ASK_QTY : ETH_X_BID_QTY;
+            // console.log(`-MAX QTY TO ARBITRAGE: ${maxQtyToArbitrage}`);
+            const maxQtyToConvert: number = BTC_ETH_BID_QTY / BTC_X_BID;
+            // console.log(`-MAX QTY TO CONVERT: ${maxQtyToConvert}`);
             maxQtyToArbitrage = maxQtyToConvert < maxQtyToArbitrage ? maxQtyToConvert : maxQtyToArbitrage;
+            // console.log(`-MAX QTY TO ARBITRAGE: ${maxQtyToArbitrage}`);
 
-            let qtyToBuy: number = CONFIG.START_BTC_QUANTITY / BTC_X_ASK;
-            if (qtyToBuy > maxQtyToArbitrage) {
+            let qtyToBuy: number = CONFIG.BITTREX.MIN_BTC_QUANTITY / BTC_X_ASK;
+            // console.log(`-QTY TO BUY: ${qtyToBuy}`);
+            if ( (qtyToBuy < maxQtyToArbitrage) && (maxQtyToArbitrage < CONFIG.BITTREX.MAX_BTC_QUANTITY / BTC_X_ASK) ) {
                 qtyToBuy = maxQtyToArbitrage;
+            } else if ( (qtyToBuy < maxQtyToArbitrage) &&
+                        (maxQtyToArbitrage > CONFIG.BITTREX.MAX_BTC_QUANTITY / BTC_X_ASK) ) {
+                qtyToBuy = CONFIG.BITTREX.MAX_BTC_QUANTITY / BTC_X_ASK;
             }
-            const ethQtyToConvert: number = qtyToBuy * ETH_X_BID;
+            const qtyToSell: number = qtyToBuy;
+            const ethQtyToSell: number = qtyToSell * ETH_X_BID;
 
-            const btcQtyNeeded = qtyToBuy * BTC_X_ASK;
-            const xQtyNeeded = qtyToBuy;
-            const ethQtyNeeded = ethQtyToConvert;
+            // const btcQtyNeeded = qtyToBuy * BTC_X_ASK;
+            // const xQtyNeeded = qtyToBuy;
+            // const ethQtyNeeded = ethQtyToConvert;
 
-            if (btcQtyNeeded <= balances.get("BTC") ||
-                ethQtyNeeded <= balances.get("ETH") ||
-                xQtyNeeded <= balances.get(coin)) {
-                    console.log("INSUFICIENT BALANCES TO EXECUTE TRIANGULAR ARBITRAGE");
-                    return;
-                }
+            // if (btcQtyNeeded <= balances.get("BTC") ||
+            //     ethQtyNeeded <= balances.get("ETH") ||
+            //     xQtyNeeded <= balances.get(coin)) {
+            //         console.log("INSUFICIENT BALANCES TO EXECUTE TRIANGULAR ARBITRAGE");
+            //         return;
+            // }
 
             // Generate quotes
             const buyQuote = new Quote(`BTC-${coin}`, BTC_X_ASK, qtyToBuy, OrderSide.BUY,
                                         OrderType.LIMIT, OrderTimeEffect.GOOD_UNTIL_CANCELED);
-            const sellQuote = new Quote(`ETH-${coin}`, ETH_X_BID, qtyToBuy, OrderSide.SELL,
+            const sellQuote = new Quote(`ETH-${coin}`, ETH_X_BID, qtyToSell, OrderSide.SELL,
                                         OrderType.LIMIT, OrderTimeEffect.GOOD_UNTIL_CANCELED);
-            const convertQuote = new Quote(`BTC-ETH`, BTC_ETH_BID, ethQtyToConvert, OrderSide.SELL,
+            const convertQuote = new Quote(`BTC-ETH`, BTC_ETH_BID, ethQtyToSell, OrderSide.SELL,
                                             OrderType.LIMIT, OrderTimeEffect.GOOD_UNTIL_CANCELED);
 
-            const triangle = new TriangularArbitrage(coin, "BTC-ETH", grossPercentageWin,
+            const triangle = new TriangularArbitrage(coin, "BTC-ETH", btcTrianglePercentageProfit,
                                                     buyQuote, sellQuote, convertQuote);
 
             this.emit(TriangularArbitrageDetector.ARBITRAGE_OPPORTUNITY_EVENT, triangle);
 
-        }
+        } else if (ethTrianglePercentageProfit > CONFIG.BITTREX.MIN_PROFIT_PERCENTAGE) {
+           /**
+            * ETH -> BTC -> ETH
+            * BUY X WITH ETH -> SELL X FOR BTC -> BUY ETH WITH BTC
+            */
+
+            // Test
+            // console.log(`[BTC-${coin}] \n` +
+            // `Bid: ${JSON.stringify(BTC_X_ORDERBOOK.bids[0])} \n` +
+            // `Ask: ${JSON.stringify(BTC_X_ORDERBOOK.asks[0])}`);
+            // console.log(`[ETH-${coin}] \n` +
+            // `Bid: ${JSON.stringify(ETH_X_ORDERBOOK.bids[0])} \n` +
+            // `Ask: ${JSON.stringify(ETH_X_ORDERBOOK.asks[0])}`);
+            // console.log(`[BTC-ETH] \n` +
+            // `Bid: ${JSON.stringify(BTC_ETH_ORDERBOOK.bids[0])} \n` +
+            // `Ask: ${JSON.stringify(BTC_ETH_ORDERBOOK.asks[0])}`);
+
+            // Calculate X quantity to arbitrage
+            let maxQtyToArbitrage: number = ETH_X_ASK_QTY < BTC_X_BID_QTY ? ETH_X_ASK_QTY : BTC_X_BID_QTY;
+            // console.log(`-MAX QTY TO ARBITRAGE: ${maxQtyToArbitrage}`);
+            const maxQtyToConvert: number = BTC_ETH_ASK_QTY / BTC_X_ASK;
+            // console.log(`-MAX QTY TO CONVERT: ${maxQtyToConvert}`);
+            maxQtyToArbitrage = maxQtyToConvert < maxQtyToArbitrage ? maxQtyToConvert : maxQtyToArbitrage;
+            // console.log(`-MAX QTY TO ARBITRAGE: ${maxQtyToArbitrage}`);
+
+            let qtyToBuy: number = CONFIG.BITTREX.MAX_ETH_QUANTITY / ETH_X_ASK;
+            // console.log(`-QTY TO BUY: ${qtyToBuy}`);
+            if ( (qtyToBuy < maxQtyToArbitrage) && (maxQtyToArbitrage < CONFIG.BITTREX.MAX_ETH_QUANTITY / ETH_X_ASK) ) {
+                qtyToBuy = maxQtyToArbitrage;
+            } else if ( (qtyToBuy < maxQtyToArbitrage) &&
+                        (maxQtyToArbitrage > CONFIG.BITTREX.MAX_ETH_QUANTITY / ETH_X_ASK) ) {
+                qtyToBuy = CONFIG.BITTREX.MAX_ETH_QUANTITY / ETH_X_ASK;
+            }
+            const qtyToSell: number = qtyToBuy;
+            const ethQtyToBuy: number = (qtyToSell * BTC_X_BID) / BTC_ETH_ASK;
+
+            // const btcQtyNeeded = btcQtyToConvert;
+            // const xQtyNeeded = qtyToBuy;
+            // const ethQtyNeeded = qtyToBuy * ETH_X_ASK;
+
+            // if (btcQtyNeeded <= balances.get("BTC") ||
+            //     ethQtyNeeded <= balances.get("ETH") ||
+            //     xQtyNeeded <= balances.get(coin)) {
+            //         console.log("INSUFICIENT BALANCES TO EXECUTE TRIANGULAR ARBITRAGE");
+            //         return;
+            // }
+
+            // Generate quotes
+            const buyQuote = new Quote(`ETH-${coin}`, ETH_X_ASK, qtyToBuy, OrderSide.BUY,
+                                        OrderType.LIMIT, OrderTimeEffect.GOOD_UNTIL_CANCELED);
+            const sellQuote = new Quote(`BTC-${coin}`, BTC_X_BID, qtyToSell, OrderSide.SELL,
+                                        OrderType.LIMIT, OrderTimeEffect.GOOD_UNTIL_CANCELED);
+            const convertQuote = new Quote(`BTC-ETH`, BTC_ETH_BID, ethQtyToBuy, OrderSide.BUY,
+                                            OrderType.LIMIT, OrderTimeEffect.GOOD_UNTIL_CANCELED);
+
+            const triangle = new TriangularArbitrage(coin, "BTC-ETH", ethTrianglePercentageProfit,
+                                                    buyQuote, sellQuote, convertQuote);
+
+            this.emit(TriangularArbitrageDetector.ARBITRAGE_OPPORTUNITY_EVENT, triangle);
+       }
 
     }
 
@@ -199,9 +322,14 @@ export default class TriangularArbitrageDetector extends EventEmitter {
         if (CONFIG.GLOBAL.IS_LOG_ACTIVE) {
             this.on(TriangularArbitrageDetector.ARBITRAGE_OPPORTUNITY_EVENT,
                     (triangularArbitrage: TriangularArbitrage) => {
-                    console.log(`\n--- TRIANGULAR ARBITRAGE [${triangularArbitrage.currency}:
-                                ${triangularArbitrage.pivotMarket}] ---  \n
-                                GAP: ${triangularArbitrage.gapPercentage}% \n`);
+                    console.log(`\n--- TRIANGULAR ARBITRAGE [${triangularArbitrage.buyQuote.marketName}] -> ` +
+                                                            `[${triangularArbitrage.sellQuote.marketName}] -> ` +
+                                                            `[${triangularArbitrage.convertQuote.marketName}] ---  \n` +
+                                `GAP: ${triangularArbitrage.gapPercentage}% \n`);
+                    // TEST
+                    // console.log(triangularArbitrage.buyQuote);
+                    // console.log(triangularArbitrage.sellQuote);
+                    // console.log(triangularArbitrage.convertQuote);
             });
         }
     }

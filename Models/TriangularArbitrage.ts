@@ -16,7 +16,9 @@ export default class TriangularArbitrage {
                 public readonly buyQuote: Quote,
                 public readonly sellQuote: Quote,
                 public readonly convertQuote: Quote) {
-        this.triangle = `${currency}-${pivotMarket}`;
+        this.triangle = `[${buyQuote.marketName}] -> ` +
+                        `[${sellQuote.marketName}] -> ` +
+                        `[${convertQuote.marketName}]`;
         this.id = `${this.triangle}-${gapPercentage}%-${Date.now()}`;
     }
 

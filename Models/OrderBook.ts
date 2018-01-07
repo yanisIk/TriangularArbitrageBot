@@ -1,6 +1,6 @@
 import { OrderCondition, OrderSide, OrderTimeEffect, OrderType } from "./Order";
 
-type OrderBookOrder = {quantity: number, rate: number};
+type OrderBookOrder = {Quantity: number, Rate: number};
 
 export default class OrderBook {
 

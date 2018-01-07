@@ -6,7 +6,6 @@ import OrderBook from "../Models/OrderBook";
 import * as CONFIG from "./../Config/CONFIG";
 import IOrderBookEventEmitter from "./IOrderBookEventEmitter";
 
-
 const bittrexClient = require("../../CustomExchangeClients/node-bittrex-api");
 const bittrex = Bluebird.promisifyAll(bittrexClient);
 bittrex.options({
@@ -46,19 +45,11 @@ export default class BittrexOrderBookEventEmitter extends EventEmitter implement
     }
 
     public async getOrderBook(marketName: string): Promise<OrderBook> {
-        try {
-            const orderBook = await bittrex.getorderbookAsync({market: marketName})
-            if (!orderBook.result) {
-                throw new Error(orderBook.message);
-            }
-            return new OrderBook(marketName, orderBook.bids, orderBook.asks);
-        } catch (err) {
-            if (err.message === "URL request error") {
-                return;
-            }
-            console.error(`!!! ERROR IN GETORDERBOOK() !!!`);
-            console.error(err);
+        const orderBook = await bittrex.getorderbookAsync({market: marketName, type: "both"});
+        if (!orderBook.success) {
+            throw new Error(orderBook.message);
         }
+        return new OrderBook(marketName, orderBook.result.buy, orderBook.result.sell);
     }
 
 }

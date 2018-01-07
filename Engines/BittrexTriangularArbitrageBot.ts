@@ -61,12 +61,12 @@ export default class BittrexTriangularArbitrageBot {
         this.openOrdersStatusDetector = new OpenOrdersStatusDetector(this.broker);
         this.triangularArbitrageDetector = new TriangularArbitrageDetector
             (this.broker, this.accountManager, this.openOrdersStatusDetector, this.tickEmitter, this.orderBookEmitter);
-        this.unfilledOrdersDetector = new UnfilleddOrdersDetector(this.broker, this.openOrdersStatusDetector);
+        // this.unfilledOrdersDetector = new UnfilleddOrdersDetector(this.broker, this.openOrdersStatusDetector);
 
         this.triangularArbitrageHandler = new TriangularArbitrageHandler
                                     (this.triangularArbitrageDetector, this.openOrdersStatusDetector, this.broker);
-        this.unfilledOrderHandler = new UnfilledOrderHandler
-                            (this.unfilledOrdersDetector, this.openOrdersStatusDetector, this.broker, this.tickEmitter);
+        // this.unfilledOrderHandler = new UnfilledOrderHandler
+        //                     (this.unfilledOrdersDetector, this.openOrdersStatusDetector, this.broker, this.tickEmitter);
 
         // this.orderLogger = new OrderLogger(this.openOrdersStatusDetector);
 
@@ -83,9 +83,13 @@ export default class BittrexTriangularArbitrageBot {
             if (i >= CONFIG.BITTREX.PIVOT_CURRENCIES.length) {
                 i = 0;
             }
+            // 1 triangle at a time
+            if (TriangularArbitrageHandler.currentlyOpenedTriangles.size) {
+                return;
+            }
             this.triangularArbitrageDetector.detect(CONFIG.BITTREX.PIVOT_CURRENCIES[i]);
             i++;
-        }, 1000);
+        }, 500);
     }
 
     /**
