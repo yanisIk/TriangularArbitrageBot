@@ -38,7 +38,7 @@ export default class BittrexTriangularArbitrageBot {
 
     private orderLogger: OrderLogger;
 
-    constructor(public readonly marketName: string) {
+    constructor(public readonly pivotMarket: string) {
         // console.log("CHECKING BALANCES...");
         // this.checkBalances();
         this.accountManager = new BittrexAccountManager();
@@ -72,23 +72,48 @@ export default class BittrexTriangularArbitrageBot {
 
     }
 
-    public start(): void {
+    public start() {
 
         console.log("STARTING !");
 
         // Loop through coins and detect triangular arbitrage
-        let i = 0;
+        let btc_eth_index = 0;
+        let usdt_btc_index = 0;
+        let usdt_eth_index = 0;
+
         setInterval(() => {
-            // emit
-            if (i >= CONFIG.BITTREX.PIVOT_CURRENCIES.length) {
-                i = 0;
+
+            if (btc_eth_index >= CONFIG.BITTREX.BTC_ETH_PIVOT_CURRENCIES.length) {
+                btc_eth_index = 0;
             }
-            // 1 triangle at a time
-            if (TriangularArbitrageHandler.currentlyOpenedTriangles.size) {
+            if (usdt_btc_index >= CONFIG.BITTREX.USDT_BTC_PIVOT_CURRENCIES.length) {
+                usdt_btc_index = 0;
+            }
+            if (usdt_eth_index >= CONFIG.BITTREX.USDT_ETH_PIVOT_CURRENCIES.length) {
+                usdt_eth_index = 0;
+            }
+
+            // 3 triangles at a time max
+            if (TriangularArbitrageHandler.currentlyOpenedTriangles.size > 3) {
                 return;
             }
-            this.triangularArbitrageDetector.detect(CONFIG.BITTREX.PIVOT_CURRENCIES[i]);
-            i++;
+
+            switch (this.pivotMarket) {
+                case "BTC-ETH":
+                    this.triangularArbitrageDetector.detect(CONFIG.BITTREX.BTC_ETH_PIVOT_CURRENCIES[btc_eth_index], this.pivotMarket);
+                    break;
+                case "USDT-BTC":
+                    this.triangularArbitrageDetector.detect(CONFIG.BITTREX.USDT_BTC_PIVOT_CURRENCIES[usdt_btc_index], this.pivotMarket);
+                    break;
+                case "USDT-ETH":
+                    this.triangularArbitrageDetector.detect(CONFIG.BITTREX.USDT_ETH_PIVOT_CURRENCIES[usdt_eth_index], this.pivotMarket);
+                    break;
+            }
+
+            btc_eth_index++;
+            usdt_btc_index++;
+            usdt_eth_index++;
+
         }, 500);
     }
 
@@ -98,15 +123,15 @@ export default class BittrexTriangularArbitrageBot {
      *  1x PIVOT MARKET
      *  1x EACH PIVOT COIN
      */
-    private async checkBalances() {
-        const balances: Map<string, number> = await this.accountManager.getBalances();
-        const pivotCoins: string[] = CONFIG.BITTREX.PIVOT_CURRENCIES;
-        let baseCoin: string;
-        let convertCoin: string;
-        [baseCoin, convertCoin] = CONFIG.BITTREX.PIVOT_MARKET.split("-");
+    // private async checkBalances() {
+    //     const balances: Map<string, number> = await this.accountManager.getBalances();
+    //     const pivotCoins: string[] = CONFIG.BITTREX.BTC_ETH_PIVOT_CURRENCIES;
+    //     let baseCoin: string;
+    //     let convertCoin: string;
+    //     [baseCoin, convertCoin] = CONFIG.BITTREX.PIVOT_MARKET.split("-");
 
-        const baseCoinQty = balances.get(baseCoin);
-        const convertCoinQty = balances.get(convertCoin);
+    //     const baseCoinQty = balances.get(baseCoin);
+    //     const convertCoinQty = balances.get(convertCoin);
 
-    }
+    // }
 }

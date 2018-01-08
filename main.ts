@@ -8,7 +8,7 @@ import * as CONFIG from "./Config/CONFIG";
 import BittrexTriangularArbitrageBot from "./Engines/BittrexTriangularArbitrageBot";
 // import BittrexExchangeService from "./Services/BittrexExchangeService";
 
-const numWorkers: number = 1; // require('os').cpus().length;
+let numWorkers: number = 1; // require('os').cpus().length;
 // USE MULTIPLE CORES
 if (cluster.isMaster) {
 
@@ -39,9 +39,11 @@ if (cluster.isMaster) {
 
         // console.log(`Selected markets:\n${JSON.stringify(allMarkets)}\n`);
 
+        numWorkers = CONFIG.BITTREX.PIVOT_MARKETS.length;
+
         for (let i = 0; i < numWorkers; i++) {
             const worker = cluster.fork();
-            worker.send({workerId: i, marketName: CONFIG.BITTREX.PIVOT_CURRENCIES[i]});
+            worker.send({workerId: i, pivotMarket: CONFIG.BITTREX.PIVOT_MARKETS[i]});
         }
     }
 
@@ -50,13 +52,13 @@ if (cluster.isMaster) {
 } else {
     process.on("message", (data) => {
         global.WORKER_ID = data.workerId;
-        global.MARKET_NAME = data.marketName;
+        global.PIVOT_MARKET = data.pivotMarket;
         global.CONFIG = CONFIG;
 
-        console.log(`WORKER#${data.workerId} MONITORING ${data.marketName}`);
+        console.log(`WORKER#${data.workerId} ANALYSING ${data.pivotMarket} TRIANGLES`);
 
         try {
-            const bittrexTriangularArbitrageBot = new BittrexTriangularArbitrageBot(data.marketName);
+            const bittrexTriangularArbitrageBot = new BittrexTriangularArbitrageBot(data.pivotMarket);
             bittrexTriangularArbitrageBot.start();
         } catch (err) {
             console.error(err);

@@ -30,30 +30,6 @@ export default class OpenOrdersStatusDetector extends EventEmitter {
         if (CONFIG.GLOBAL.IS_LOG_ACTIVE) {
             this.logEvents();
         }
-
-        this.on(UPDATE_ORDER_STATUS_EVENTS.FILLED_BUY_ORDER, (order: Order) => {
-            console.log(`\n--- FILLED BUY ORDER [${order.marketName}] --- \nOrderID: ${order.id}\n` +
-                        `Quantity Filled:${order.quantityFilled} @ Rate:${order.rate}\n`);
-        });
-        this.on(UPDATE_ORDER_STATUS_EVENTS.PARTIALLY_FILLED_BUY_ORDER, (order: Order) => {
-            console.log(`\n--- PARTIALLY FILLED BUY ORDER [${order.marketName}] --- \nOrderID: ${order.id}\n` +
-                        `Partial Fill Qty:${order.partialFill}\n` +
-                        `Quantity Filled:${order.quantityFilled}\n` +
-                        `Qty Remaining: ${order.quantityRemaining}\n` +
-                        `@ Rate:${order.rate}\n`);
-        });
-        this.on(UPDATE_ORDER_STATUS_EVENTS.FILLED_SELL_ORDER, (order: Order) => {
-            console.log(`\n--- FILLED SELL ORDER [${order.marketName}] --- \nOrderID: ${order.id}\n` +
-                        `Quantity Filled:${order.quantityFilled} @ Rate:${order.rate}\n`);
-        });
-        this.on(UPDATE_ORDER_STATUS_EVENTS.PARTIALLY_FILLED_SELL_ORDER, (order: Order) => {
-            console.log(`\n--- PARTIALLY FILLED SELL ORDER [${order.marketName}] --- \nOrderID: ${order.id}\n` +
-            `Partial Fill Qty:${order.partialFill}\n` +
-            `Quantity Filled:${order.quantityFilled}\n` +
-            `Qty Remaining: ${order.quantityRemaining}\n` +
-            `@ Rate:${order.rate}\n`);
-        });
-
     }
 
     /**
@@ -191,17 +167,40 @@ export default class OpenOrdersStatusDetector extends EventEmitter {
     }
 
     private logEvents(): void {
-        
+
         if (CONFIG.GLOBAL.IS_LOG_ACTIVE) {
-            
-            this.on(UPDATE_ORDER_STATUS_EVENTS.CANCELED_BUY_ORDER, (order: Order) => {
-                console.log(`\n--- CANCELLED BUY ORDER [${order.marketName}] --- \nOrderID: ${order.id}\n` +
-                            `Quantity Filled:${order.quantityFilled} Rate:${order.rate}\n`);
-            });
-            this.on(UPDATE_ORDER_STATUS_EVENTS.CANCELED_SELL_ORDER, (order: Order) => {
-                console.log(`\n--- CANCELLED SELL ORDER [${order.marketName}] --- \nOrderID: ${order.id}\n` +
-                            `Quantity Filled:${order.quantityFilled} Rate:${order.rate}\n`);
-            });
+
+            // this.on(UPDATE_ORDER_STATUS_EVENTS.FILLED_BUY_ORDER, (order: Order) => {
+            //     console.log(`\n--- FILLED BUY ORDER [${order.marketName}] --- \nOrderID: ${order.id}\n` +
+            //                 `Quantity Filled:${order.quantityFilled} @ Rate:${order.rate}\n`);
+            // });
+            // this.on(UPDATE_ORDER_STATUS_EVENTS.PARTIALLY_FILLED_BUY_ORDER, (order: Order) => {
+            //     console.log(`\n--- PARTIALLY FILLED BUY ORDER [${order.marketName}] --- \nOrderID: ${order.id}\n` +
+            //                 `Partial Fill Qty:${order.partialFill}\n` +
+            //                 `Quantity Filled:${order.quantityFilled}\n` +
+            //                 `Qty Remaining: ${order.quantityRemaining}\n` +
+            //                 `@ Rate:${order.rate}\n`);
+            // });
+            // this.on(UPDATE_ORDER_STATUS_EVENTS.FILLED_SELL_ORDER, (order: Order) => {
+            //     console.log(`\n--- FILLED SELL ORDER [${order.marketName}] --- \nOrderID: ${order.id}\n` +
+            //                 `Quantity Filled:${order.quantityFilled} @ Rate:${order.rate}\n`);
+            // });
+            // this.on(UPDATE_ORDER_STATUS_EVENTS.PARTIALLY_FILLED_SELL_ORDER, (order: Order) => {
+            //     console.log(`\n--- PARTIALLY FILLED SELL ORDER [${order.marketName}] --- \nOrderID: ${order.id}\n` +
+            //     `Partial Fill Qty:${order.partialFill}\n` +
+            //     `Quantity Filled:${order.quantityFilled}\n` +
+            //     `Qty Remaining: ${order.quantityRemaining}\n` +
+            //     `@ Rate:${order.rate}\n`);
+            // });
+
+            // this.on(UPDATE_ORDER_STATUS_EVENTS.CANCELED_BUY_ORDER, (order: Order) => {
+            //     console.log(`\n--- CANCELLED BUY ORDER [${order.marketName}] --- \nOrderID: ${order.id}\n` +
+            //                 `Quantity Filled:${order.quantityFilled} Rate:${order.rate}\n`);
+            // });
+            // this.on(UPDATE_ORDER_STATUS_EVENTS.CANCELED_SELL_ORDER, (order: Order) => {
+            //     console.log(`\n--- CANCELLED SELL ORDER [${order.marketName}] --- \nOrderID: ${order.id}\n` +
+            //                 `Quantity Filled:${order.quantityFilled} Rate:${order.rate}\n`);
+            // });
         }
     }
 

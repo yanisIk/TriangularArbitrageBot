@@ -15,7 +15,8 @@ export default class TriangularArbitrage {
                 public readonly gapPercentage: number,
                 public readonly buyQuote: Quote,
                 public readonly sellQuote: Quote,
-                public readonly convertQuote: Quote) {
+                public readonly convertQuote: Quote,
+                public readonly maxQtyToArbitrage: number) {
         this.triangle = `[${buyQuote.marketName}] -> ` +
                         `[${sellQuote.marketName}] -> ` +
                         `[${convertQuote.marketName}]`;
@@ -41,5 +42,5 @@ export default class TriangularArbitrage {
 export enum TriangularArbitrageStatus {
     IDLE,
     OPEN,
-    CLOSE
+    CLOSE,
 }

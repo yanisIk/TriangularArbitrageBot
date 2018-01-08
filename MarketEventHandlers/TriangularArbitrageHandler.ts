@@ -51,7 +51,7 @@ export default class TriangularArbitrageHandler extends EventEmitter {
 
         TriangularArbitrageHandler.currentlyOpenedTriangles.set(triangularArbitrage.triangle, triangularArbitrage);
 
-        // Send orders
+        // Send buy and convert orders
         const buyOrderPromise = this.broker.buy(triangularArbitrage.buyQuote);
         const convertOrderPromise = triangularArbitrage.convertQuote.side === OrderSide.BUY ?
             this.broker.buy(triangularArbitrage.convertQuote) : this.broker.sell(triangularArbitrage.convertQuote);
@@ -68,8 +68,20 @@ export default class TriangularArbitrageHandler extends EventEmitter {
         const filledBuyOrderPromise: Promise<Order> = this.getFilledOrderPromise(buyOrder.id);
         const filledConverPromisetOrderPromise: Promise<Order> = this.getFilledOrderPromise(convertOrder.id);
 
+        // TODO Listen to partial fills
+        // const partialFillsListener = (partialFill: Order) => {
+        //     const sellQuote: Quote = triangularArbitrage.sellQuote;
+        //     sellQuote.quantity = partialFill.partialFill;
+        //     this.broker.sell(sellQuote);
+        // };
+
+        // this.openOrdersStatusDetector.PARTIALLY_FILLED_BUY_ORDER_EVENT_EMITTER.on(buyOrder.id, partialFillsListener);
+
         // When buyFilled, Sell
         const filledBuyOrder: Order = await filledBuyOrderPromise;
+        // TODO
+        // this.openOrdersStatusDetector.PARTIALLY_FILLED_BUY_ORDER_EVENT_EMITTER
+        //                              .removeListener(buyOrder.id, partialFillsListener);
         const sellOrder: Order = await this.broker.sell(triangularArbitrage.sellQuote);
 
         // Watch Sell order
@@ -83,7 +95,6 @@ export default class TriangularArbitrageHandler extends EventEmitter {
 
         let filledSellOrder: Order;
         let filledConvertOrder: Order;
-
 
         // TODO sometimes doesnt resolve if already resolved
         const AllFilledOrdersPromise = Promise.all([
@@ -131,22 +142,22 @@ export default class TriangularArbitrageHandler extends EventEmitter {
         if (CONFIG.GLOBAL.IS_LOG_ACTIVE) {
             this.on(TriangularArbitrageHandler.OPEN_TRIANGLE_EVENT,
                     (triangularArbitrage: TriangularArbitrage) => {
-                    console.log(`\n--- OPENED TRIANGULAR ARBITRAGE [${triangularArbitrage.buyQuote.marketName}] -> ` +
+                    console.log(`\n-o-o--o-o- OPENED TRIANGULAR ARBITRAGE [${triangularArbitrage.buyQuote.marketName}] -> ` +
                                                             `[${triangularArbitrage.sellQuote.marketName}] -> ` +
-                                                            `[${triangularArbitrage.convertQuote.marketName}] ---  \n` +
-                                `GAP: ${triangularArbitrage.gapPercentage}% \n` +
-                                `QUANTITY: ${triangularArbitrage.buyQuote.quantity * triangularArbitrage.buyQuote.rate} -> ` +
-                                           `${triangularArbitrage.convertQuote.quantity * triangularArbitrage.convertQuote.rate} \n`);
+                                                            `[${triangularArbitrage.convertQuote.marketName}] -o-o--o-o-  \n` +
+                                `GAP: ${triangularArbitrage.gapPercentage.toFixed(4)}% \n` +
+                                `QUANTITY: ${(triangularArbitrage.buyQuote.quantity * triangularArbitrage.buyQuote.rate).toFixed(6)} -> ` +
+                                           `${(triangularArbitrage.convertQuote.quantity * triangularArbitrage.convertQuote.rate).toFixed(6)}\n`);
             });
 
             this.on(TriangularArbitrageHandler.CLOSE_TRIANGLE_EVENT,
                 (triangularArbitrage: TriangularArbitrage) => {
-                console.log(`\n--- CLOSED TRIANGULAR ARBITRAGE [${triangularArbitrage.buyQuote.marketName}] -> ` +
+                console.log(`\n-o-o--o-o- CLOSED TRIANGULAR ARBITRAGE [${triangularArbitrage.buyQuote.marketName}] -> ` +
                                                         `[${triangularArbitrage.sellQuote.marketName}] -> ` +
-                                                        `[${triangularArbitrage.convertQuote.marketName}] ---  \n` +
-                            `GAP: ${triangularArbitrage.gapPercentage}% \n` +
-                            `QUANTITY: ${triangularArbitrage.buyOrder.quantity * triangularArbitrage.buyOrder.rate} ->` +
-                                       `${triangularArbitrage.convertOrder.quantity * triangularArbitrage.convertOrder.rate} \n`);
+                                                        `[${triangularArbitrage.convertQuote.marketName}] -o-o--o-o-  \n` +
+                            `GAP: ${triangularArbitrage.gapPercentage.toFixed(4)}% \n` +
+                            `QUANTITY: ${(triangularArbitrage.buyOrder.quantity * triangularArbitrage.buyOrder.rate).toFixed(6)} -> ` +
+                                       `${(triangularArbitrage.convertOrder.quantity * triangularArbitrage.convertOrder.rate).toFixed(6)}\n`);
             });
         }
     }

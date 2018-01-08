@@ -352,17 +352,18 @@ export default class BittrexBroker extends EventEmitter implements IBroker {
 
     private logEvents(): void {
         if (CONFIG.GLOBAL.IS_LOG_ACTIVE) {
-            this.on(OPEN_ORDER_EVENTS.OPEN_BUY_ORDER_EVENT, (order: Order) => {
-                console.log(`\n--- NEW OPEN BUY ORDER [${order.marketName}] --- \nOrderID: ${order.id}\n` +
-                            `Quantity:${order.quantity} @ Rate:${order.rate}\n`);
-            });
-            this.on(OPEN_ORDER_EVENTS.OPEN_SELL_ORDER_EVENT, (order: Order) => {
-                console.log(`\n--- NEW OPEN SELL ORDER [${order.marketName}] --- \nOrderID: ${order.id}\n` +
-                            `Quantity:${order.quantity} @ Rate:${order.rate}\n`);
-            });
-            this.on(OPEN_ORDER_EVENTS.OPEN_CANCEL_ORDER_EVENT, (orderId: string) => {
-                console.log(`\n--- NEW OPEN CANCEL ORDER --- \nOrderID: ${orderId}\n`);
-            });
+            // TEST
+            // this.on(OPEN_ORDER_EVENTS.OPEN_BUY_ORDER_EVENT, (order: Order) => {
+            //     console.log(`\n--- NEW OPEN BUY ORDER [${order.marketName}] --- \nOrderID: ${order.id}\n` +
+            //                 `Quantity:${order.quantity} @ Rate:${order.rate}\n`);
+            // });
+            // this.on(OPEN_ORDER_EVENTS.OPEN_SELL_ORDER_EVENT, (order: Order) => {
+            //     console.log(`\n--- NEW OPEN SELL ORDER [${order.marketName}] --- \nOrderID: ${order.id}\n` +
+            //                 `Quantity:${order.quantity} @ Rate:${order.rate}\n`);
+            // });
+            // this.on(OPEN_ORDER_EVENTS.OPEN_CANCEL_ORDER_EVENT, (orderId: string) => {
+            //     console.log(`\n--- NEW OPEN CANCEL ORDER --- \nOrderID: ${orderId}\n`);
+            // });
         }
     }
 }
