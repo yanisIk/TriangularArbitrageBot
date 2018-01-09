@@ -135,20 +135,31 @@ export default class TriangularArbitrageDetector extends EventEmitter {
         let BTC_ETH_BID_QTY = BTC_ETH_ORDERBOOK.bids[0].Quantity;
         let BTC_ETH_ASK_QTY = BTC_ETH_ORDERBOOK.asks[0].Quantity;
 
-        // if ( (BTC_X_ASK_QTY * BTC_X_ASK) < CONFIG.BITTREX.MIN_BTC_QUANTITY ||
-        //      (BTC_X_BID_QTY * BTC_X_BID) < CONFIG.BITTREX.MIN_BTC_QUANTITY ||
-        //      (ETH_X_ASK_QTY * ETH_X_ASK) < CONFIG.BITTREX.MIN_ETH_QUANTITY ||
-        //      (ETH_X_BID_QTY * ETH_X_BID) < CONFIG.BITTREX.MIN_ETH_QUANTITY
-        //     ) {
-        //         console.log(`!!! QUANTITIES TOO LOW IN BIDS & ASKS !!!`);
-        //         return;
-        // }
-
-        // FORMULA:  COIN1 -> COIN2 -> COIN1
-        // if can buy X for COIN1, sell X for COIN2 and get more COIN1 when CONVERTING COIN2
-        // if COIN2 BID converted to COIN1 > value in COIN1 ASK
-        // BUY X IN COIN1 -> SELL X IN COIN2 -> BUY/SELL COIN2 IN COIN1
-        // 1 UNIT BUY IN COIN1 < 1 UNIT
+        // Check quantities and reset bid or ask to the one with 'legit' quantity
+        if ((BTC_X_ASK_QTY * BTC_X_ASK) < CONFIG.BITTREX.MIN_BTC_QUANTITY / BTC_X_ASK) {
+            BTC_X_ASK = BTC_X_ORDERBOOK.asks[1].Rate;
+            BTC_X_ASK_QTY = BTC_X_ORDERBOOK.asks[1].Quantity;
+        }
+        if ((BTC_X_BID_QTY * BTC_X_BID) < CONFIG.BITTREX.MIN_BTC_QUANTITY / BTC_X_BID) {
+            BTC_X_BID = BTC_X_ORDERBOOK.bids[1].Rate;
+            BTC_X_BID_QTY = BTC_X_ORDERBOOK.bids[1].Quantity;
+        }
+        if ((ETH_X_ASK_QTY * ETH_X_ASK) < CONFIG.BITTREX.MIN_ETH_QUANTITY / ETH_X_ASK) {
+            ETH_X_ASK = ETH_X_ORDERBOOK.asks[1].Rate;
+            ETH_X_ASK_QTY = ETH_X_ORDERBOOK.asks[1].Quantity;
+        }
+        if ((ETH_X_BID_QTY * ETH_X_BID) < CONFIG.BITTREX.MIN_ETH_QUANTITY / ETH_X_BID) {
+            ETH_X_BID = ETH_X_ORDERBOOK.bids[1].Rate;
+            ETH_X_BID_QTY = ETH_X_ORDERBOOK.bids[1].Quantity;
+        }
+        if ((BTC_ETH_ASK_QTY * BTC_ETH_ASK) < CONFIG.BITTREX.MIN_BTC_QUANTITY / BTC_ETH_ASK) {
+            BTC_ETH_ASK = BTC_ETH_ORDERBOOK.asks[1].Rate;
+            BTC_ETH_ASK_QTY = BTC_ETH_ORDERBOOK.asks[1].Quantity;
+        }
+        if ((BTC_ETH_BID_QTY * BTC_ETH_BID) < CONFIG.BITTREX.MIN_BTC_QUANTITY / BTC_ETH_BID) {
+            BTC_ETH_BID = BTC_ETH_ORDERBOOK.bids[1].Rate;
+            BTC_ETH_BID_QTY = BTC_ETH_ORDERBOOK.bids[1].Quantity;
+        }
 
         /**
          * BTC -> ETH -> BTC
@@ -179,17 +190,14 @@ export default class TriangularArbitrageDetector extends EventEmitter {
             maxQtyToArbitrage = maxQtyToConvert < maxQtyToArbitrage ? maxQtyToConvert : maxQtyToArbitrage;
             // console.log(`-MAX QTY TO ARBITRAGE: ${maxQtyToArbitrage}`);
 
-            if (maxQtyToArbitrage < CONFIG.BITTREX.MIN_BTC_QUANTITY / BTC_X_ASK) {
-                return;
-            }
+            // if (maxQtyToArbitrage < CONFIG.BITTREX.MIN_BTC_QUANTITY / BTC_X_ASK) {
+            //     return;
+            // }
 
             let qtyToBuy: number = CONFIG.BITTREX.MAX_BTC_QUANTITY / BTC_X_ASK;
             // console.log(`-QTY TO BUY: ${qtyToBuy}`);
-            if ( (qtyToBuy < maxQtyToArbitrage) && (maxQtyToArbitrage < CONFIG.BITTREX.MAX_BTC_QUANTITY / BTC_X_ASK) ) {
+            if (qtyToBuy > maxQtyToArbitrage) {
                 qtyToBuy = maxQtyToArbitrage;
-            } else if ( (qtyToBuy < maxQtyToArbitrage) &&
-                        (maxQtyToArbitrage > CONFIG.BITTREX.MAX_BTC_QUANTITY / BTC_X_ASK) ) {
-                qtyToBuy = CONFIG.BITTREX.MAX_BTC_QUANTITY / BTC_X_ASK;
             }
             const qtyToSell: number = qtyToBuy;
             const ethQtyToSell: number = (qtyToSell * ETH_X_BID);
@@ -245,17 +253,14 @@ export default class TriangularArbitrageDetector extends EventEmitter {
             maxQtyToArbitrage = maxQtyToConvert < maxQtyToArbitrage ? maxQtyToConvert : maxQtyToArbitrage;
             // console.log(`-MAX QTY TO ARBITRAGE: ${maxQtyToArbitrage}`);
 
-            if (maxQtyToArbitrage < CONFIG.BITTREX.MIN_ETH_QUANTITY / ETH_X_ASK) {
-                return;
-            }
+            // if (maxQtyToArbitrage < CONFIG.BITTREX.MIN_ETH_QUANTITY / ETH_X_ASK) {
+            //     return;
+            // }
 
             let qtyToBuy: number = CONFIG.BITTREX.MAX_ETH_QUANTITY / ETH_X_ASK;
             // console.log(`-QTY TO BUY: ${qtyToBuy}`);
-            if ( (qtyToBuy < maxQtyToArbitrage) && (maxQtyToArbitrage < CONFIG.BITTREX.MAX_ETH_QUANTITY / ETH_X_ASK) ) {
+            if (qtyToBuy > maxQtyToArbitrage) {
                 qtyToBuy = maxQtyToArbitrage;
-            } else if ( (qtyToBuy < maxQtyToArbitrage) &&
-                        (maxQtyToArbitrage > CONFIG.BITTREX.MAX_ETH_QUANTITY / ETH_X_ASK) ) {
-                qtyToBuy = CONFIG.BITTREX.MAX_ETH_QUANTITY / ETH_X_ASK;
             }
             const qtyToSell: number = qtyToBuy;
             const ethQtyToBuy: number = (qtyToSell * BTC_X_BID) / BTC_ETH_ASK;
@@ -328,35 +333,45 @@ export default class TriangularArbitrageDetector extends EventEmitter {
                 return;
         }
 
-        const BTC_X_BID = BTC_X_ORDERBOOK.bids[0].Rate;
-        const BTC_X_ASK = BTC_X_ORDERBOOK.asks[0].Rate;
-        const BTC_X_ASK_QTY = BTC_X_ORDERBOOK.asks[0].Quantity;
-        const BTC_X_BID_QTY = BTC_X_ORDERBOOK.bids[0].Quantity;
+        let BTC_X_BID = BTC_X_ORDERBOOK.bids[0].Rate;
+        let BTC_X_ASK = BTC_X_ORDERBOOK.asks[0].Rate;
+        let BTC_X_ASK_QTY = BTC_X_ORDERBOOK.asks[0].Quantity;
+        let BTC_X_BID_QTY = BTC_X_ORDERBOOK.bids[0].Quantity;
 
-        const USDT_X_BID = USDT_X_ORDERBOOK.bids[0].Rate;
-        const USDT_X_ASK = USDT_X_ORDERBOOK.asks[0].Rate;
-        const USDT_X_BID_QTY = USDT_X_ORDERBOOK.bids[0].Quantity;
-        const USDT_X_ASK_QTY = USDT_X_ORDERBOOK.asks[0].Quantity;
+        let USDT_X_BID = USDT_X_ORDERBOOK.bids[0].Rate;
+        let USDT_X_ASK = USDT_X_ORDERBOOK.asks[0].Rate;
+        let USDT_X_BID_QTY = USDT_X_ORDERBOOK.bids[0].Quantity;
+        let USDT_X_ASK_QTY = USDT_X_ORDERBOOK.asks[0].Quantity;
 
-        const USDT_BTC_BID = USDT_BTC_ORDERBOOK.bids[0].Rate;
-        const USDT_BTC_ASK = USDT_BTC_ORDERBOOK.asks[0].Rate;
-        const USDT_BTC_BID_QTY = USDT_BTC_ORDERBOOK.bids[0].Quantity;
-        const USDT_BTC_ASK_QTY = USDT_BTC_ORDERBOOK.asks[0].Quantity;
+        let USDT_BTC_BID = USDT_BTC_ORDERBOOK.bids[0].Rate;
+        let USDT_BTC_ASK = USDT_BTC_ORDERBOOK.asks[0].Rate;
+        let USDT_BTC_BID_QTY = USDT_BTC_ORDERBOOK.bids[0].Quantity;
+        let USDT_BTC_ASK_QTY = USDT_BTC_ORDERBOOK.asks[0].Quantity;
 
-        // if ( (BTC_X_ASK_QTY * BTC_X_ASK) < CONFIG.BITTREX.MIN_BTC_QUANTITY ||
-        //      (BTC_X_BID_QTY * BTC_X_BID) < CONFIG.BITTREX.MIN_BTC_QUANTITY ||
-        //      (ETH_X_ASK_QTY * ETH_X_ASK) < CONFIG.BITTREX.MIN_ETH_QUANTITY ||
-        //      (ETH_X_BID_QTY * ETH_X_BID) < CONFIG.BITTREX.MIN_ETH_QUANTITY
-        //     ) {
-        //         console.log(`!!! QUANTITIES TOO LOW IN BIDS & ASKS !!!`);
-        //         return;
-        // }
-
-        // FORMULA:  COIN1 -> COIN2 -> COIN1
-        // if can buy X for COIN1, sell X for COIN2 and get more COIN1 when CONVERTING COIN2
-        // if COIN2 BID converted to COIN1 > value in COIN1 ASK
-        // BUY X IN COIN1 -> SELL X IN COIN2 -> BUY/SELL COIN2 IN COIN1
-        // 1 UNIT BUY IN COIN1 < 1 UNIT
+        if ((BTC_X_ASK_QTY * BTC_X_ASK) < CONFIG.BITTREX.MIN_BTC_QUANTITY / BTC_X_ASK) {
+            BTC_X_ASK = BTC_X_ORDERBOOK.asks[1].Rate;
+            BTC_X_ASK_QTY = BTC_X_ORDERBOOK.asks[1].Quantity;
+        }
+        if ((BTC_X_BID_QTY * BTC_X_BID) < CONFIG.BITTREX.MIN_BTC_QUANTITY / BTC_X_BID) {
+            BTC_X_BID = BTC_X_ORDERBOOK.bids[1].Rate;
+            BTC_X_BID_QTY = BTC_X_ORDERBOOK.bids[1].Quantity;
+        }
+        if ((USDT_X_ASK_QTY * USDT_X_ASK) < CONFIG.BITTREX.MIN_USDT_QUANTITY / USDT_X_ASK) {
+            USDT_X_ASK = USDT_X_ORDERBOOK.asks[1].Rate;
+            USDT_X_ASK_QTY = USDT_X_ORDERBOOK.asks[1].Quantity;
+        }
+        if ((USDT_X_BID_QTY * USDT_X_BID) < CONFIG.BITTREX.MIN_USDT_QUANTITY / USDT_X_BID) {
+            USDT_X_BID = USDT_X_ORDERBOOK.bids[1].Rate;
+            USDT_X_BID_QTY = USDT_X_ORDERBOOK.bids[1].Quantity;
+        }
+        if ((USDT_BTC_ASK_QTY * USDT_BTC_ASK) < CONFIG.BITTREX.MIN_USDT_QUANTITY / USDT_BTC_ASK) {
+            USDT_BTC_ASK = USDT_BTC_ORDERBOOK.asks[1].Rate;
+            USDT_BTC_ASK_QTY = USDT_BTC_ORDERBOOK.asks[1].Quantity;
+        }
+        if ((USDT_BTC_BID_QTY * USDT_BTC_BID) < CONFIG.BITTREX.MIN_USDT_QUANTITY / USDT_BTC_BID) {
+            USDT_BTC_BID = USDT_BTC_ORDERBOOK.bids[1].Rate;
+            USDT_BTC_BID_QTY = USDT_BTC_ORDERBOOK.bids[1].Quantity;
+        }
 
         /**
          * BTC -> USDT -> BTC
@@ -387,17 +402,14 @@ export default class TriangularArbitrageDetector extends EventEmitter {
             maxQtyToArbitrage = maxQtyToConvert < maxQtyToArbitrage ? maxQtyToConvert : maxQtyToArbitrage;
             // console.log(`-MAX QTY TO ARBITRAGE: ${maxQtyToArbitrage}`);
 
-            if (maxQtyToArbitrage < CONFIG.BITTREX.MIN_BTC_QUANTITY / BTC_X_ASK) {
-                return;
-            }
+            // if (maxQtyToArbitrage < CONFIG.BITTREX.MIN_BTC_QUANTITY / BTC_X_ASK) {
+            //     return;
+            // }
 
             let qtyToBuy: number = CONFIG.BITTREX.MAX_BTC_QUANTITY / BTC_X_ASK;
             // console.log(`-QTY TO BUY: ${qtyToBuy}`);
-            if ( (qtyToBuy < maxQtyToArbitrage) && (maxQtyToArbitrage < CONFIG.BITTREX.MAX_BTC_QUANTITY / BTC_X_ASK) ) {
+            if (qtyToBuy > maxQtyToArbitrage) {
                 qtyToBuy = maxQtyToArbitrage;
-            } else if ( (qtyToBuy < maxQtyToArbitrage) &&
-                        (maxQtyToArbitrage > CONFIG.BITTREX.MAX_BTC_QUANTITY / BTC_X_ASK) ) {
-                qtyToBuy = CONFIG.BITTREX.MAX_BTC_QUANTITY / BTC_X_ASK;
             }
             const qtyToSell: number = qtyToBuy;
             const btcQtyToBuy: number = (qtyToSell * USDT_X_BID) / USDT_BTC_ASK;
@@ -453,18 +465,14 @@ export default class TriangularArbitrageDetector extends EventEmitter {
             maxQtyToArbitrage = maxQtyToConvert < maxQtyToArbitrage ? maxQtyToConvert : maxQtyToArbitrage;
             // console.log(`-MAX QTY TO ARBITRAGE: ${maxQtyToArbitrage}`);
 
-            if (maxQtyToArbitrage < CONFIG.BITTREX.MIN_USDT_QUANTITY / USDT_X_ASK) {
-                return;
-            }
+            // if (maxQtyToArbitrage < CONFIG.BITTREX.MIN_USDT_QUANTITY / USDT_X_ASK) {
+            //     return;
+            // }
 
             let qtyToBuy: number = CONFIG.BITTREX.MAX_USDT_QUANTITY / USDT_X_ASK;
             // console.log(`-QTY TO BUY: ${qtyToBuy}`);
-            if ( (qtyToBuy < maxQtyToArbitrage) &&
-                 (maxQtyToArbitrage < CONFIG.BITTREX.MAX_USDT_QUANTITY / USDT_X_ASK) ) {
+            if (qtyToBuy > maxQtyToArbitrage) {
                 qtyToBuy = maxQtyToArbitrage;
-            } else if ( (qtyToBuy < maxQtyToArbitrage) &&
-                        (maxQtyToArbitrage > CONFIG.BITTREX.MAX_USDT_QUANTITY / USDT_X_ASK) ) {
-                qtyToBuy = CONFIG.BITTREX.MAX_USDT_QUANTITY / USDT_X_ASK;
             }
             const qtyToSell: number = qtyToBuy;
             const btcQuantityToSell: number = qtyToSell * BTC_X_BID;
@@ -537,35 +545,45 @@ export default class TriangularArbitrageDetector extends EventEmitter {
                 return;
         }
 
-        const ETH_X_BID = ETH_X_ORDERBOOK.bids[0].Rate;
-        const ETH_X_ASK = ETH_X_ORDERBOOK.asks[0].Rate;
-        const ETH_X_ASK_QTY = ETH_X_ORDERBOOK.asks[0].Quantity;
-        const ETH_X_BID_QTY = ETH_X_ORDERBOOK.bids[0].Quantity;
+        let ETH_X_BID = ETH_X_ORDERBOOK.bids[0].Rate;
+        let ETH_X_ASK = ETH_X_ORDERBOOK.asks[0].Rate;
+        let ETH_X_ASK_QTY = ETH_X_ORDERBOOK.asks[0].Quantity;
+        let ETH_X_BID_QTY = ETH_X_ORDERBOOK.bids[0].Quantity;
 
-        const USDT_X_BID = USDT_X_ORDERBOOK.bids[0].Rate;
-        const USDT_X_ASK = USDT_X_ORDERBOOK.asks[0].Rate;
-        const USDT_X_BID_QTY = USDT_X_ORDERBOOK.bids[0].Quantity;
-        const USDT_X_ASK_QTY = USDT_X_ORDERBOOK.asks[0].Quantity;
+        let USDT_X_BID = USDT_X_ORDERBOOK.bids[0].Rate;
+        let USDT_X_ASK = USDT_X_ORDERBOOK.asks[0].Rate;
+        let USDT_X_BID_QTY = USDT_X_ORDERBOOK.bids[0].Quantity;
+        let USDT_X_ASK_QTY = USDT_X_ORDERBOOK.asks[0].Quantity;
 
-        const USDT_ETH_BID = USDT_ETH_ORDERBOOK.bids[0].Rate;
-        const USDT_ETH_ASK = USDT_ETH_ORDERBOOK.asks[0].Rate;
-        const USDT_ETH_BID_QTY = USDT_ETH_ORDERBOOK.bids[0].Quantity;
-        const USDT_ETH_ASK_QTY = USDT_ETH_ORDERBOOK.asks[0].Quantity;
+        let USDT_ETH_BID = USDT_ETH_ORDERBOOK.bids[0].Rate;
+        let USDT_ETH_ASK = USDT_ETH_ORDERBOOK.asks[0].Rate;
+        let USDT_ETH_BID_QTY = USDT_ETH_ORDERBOOK.bids[0].Quantity;
+        let USDT_ETH_ASK_QTY = USDT_ETH_ORDERBOOK.asks[0].Quantity;
 
-        // if ( (ETH_X_ASK_QTY * ETH_X_ASK) < CONFIG.BITTREX.MIN_ETH_QUANTITY ||
-        //      (ETH_X_BID_QTY * ETH_X_BID) < CONFIG.BITTREX.MIN_ETH_QUANTITY ||
-        //      (ETH_X_ASK_QTY * ETH_X_ASK) < CONFIG.BITTREX.MIN_ETH_QUANTITY ||
-        //      (ETH_X_BID_QTY * ETH_X_BID) < CONFIG.BITTREX.MIN_ETH_QUANTITY
-        //     ) {
-        //         console.log(`!!! QUANTITIES TOO LOW IN BIDS & ASKS !!!`);
-        //         return;
-        // }
-
-        // FORMULA:  COIN1 -> COIN2 -> COIN1
-        // if can buy X for COIN1, sell X for COIN2 and get more COIN1 when CONVERTING COIN2
-        // if COIN2 BID converted to COIN1 > value in COIN1 ASK
-        // BUY X IN COIN1 -> SELL X IN COIN2 -> BUY/SELL COIN2 IN COIN1
-        // 1 UNIT BUY IN COIN1 < 1 UNIT
+        if ((ETH_X_ASK_QTY * ETH_X_ASK) < CONFIG.BITTREX.MIN_BTC_QUANTITY / ETH_X_ASK) {
+            ETH_X_ASK = ETH_X_ORDERBOOK.asks[1].Rate;
+            ETH_X_ASK_QTY = ETH_X_ORDERBOOK.asks[1].Quantity;
+        }
+        if ((ETH_X_BID_QTY * ETH_X_BID) < CONFIG.BITTREX.MIN_BTC_QUANTITY / ETH_X_BID) {
+            ETH_X_BID = ETH_X_ORDERBOOK.bids[1].Rate;
+            ETH_X_BID_QTY = ETH_X_ORDERBOOK.bids[1].Quantity;
+        }
+        if ((USDT_X_ASK_QTY * USDT_X_ASK) < CONFIG.BITTREX.MIN_USDT_QUANTITY / USDT_X_ASK) {
+            USDT_X_ASK = USDT_X_ORDERBOOK.asks[1].Rate;
+            USDT_X_ASK_QTY = USDT_X_ORDERBOOK.asks[1].Quantity;
+        }
+        if ((USDT_X_BID_QTY * USDT_X_BID) < CONFIG.BITTREX.MIN_USDT_QUANTITY / USDT_X_BID) {
+            USDT_X_BID = USDT_X_ORDERBOOK.bids[1].Rate;
+            USDT_X_BID_QTY = USDT_X_ORDERBOOK.bids[1].Quantity;
+        }
+        if ((USDT_ETH_ASK_QTY * USDT_ETH_ASK) < CONFIG.BITTREX.MIN_USDT_QUANTITY / USDT_ETH_ASK) {
+            USDT_ETH_ASK = USDT_ETH_ORDERBOOK.asks[1].Rate;
+            USDT_ETH_ASK_QTY = USDT_ETH_ORDERBOOK.asks[1].Quantity;
+        }
+        if ((USDT_ETH_BID_QTY * USDT_ETH_BID) < CONFIG.BITTREX.MIN_USDT_QUANTITY / USDT_ETH_BID) {
+            USDT_ETH_BID = USDT_ETH_ORDERBOOK.bids[1].Rate;
+            USDT_ETH_BID_QTY = USDT_ETH_ORDERBOOK.bids[1].Quantity;
+        }
 
         /**
          * ETH -> USDT -> ETH
@@ -596,17 +614,14 @@ export default class TriangularArbitrageDetector extends EventEmitter {
             maxQtyToArbitrage = maxQtyToConvert < maxQtyToArbitrage ? maxQtyToConvert : maxQtyToArbitrage;
             // console.log(`-MAX QTY TO ARBITRAGE: ${maxQtyToArbitrage}`);
 
-            if (maxQtyToArbitrage < CONFIG.BITTREX.MIN_ETH_QUANTITY / ETH_X_ASK) {
-                return;
-            }
+            // if (maxQtyToArbitrage < CONFIG.BITTREX.MIN_ETH_QUANTITY / ETH_X_ASK) {
+            //     return;
+            // }
 
-            let qtyToBuy: number = CONFIG.BITTREX.MIN_ETH_QUANTITY / ETH_X_ASK;
+            let qtyToBuy: number = CONFIG.BITTREX.MAX_ETH_QUANTITY / ETH_X_ASK;
             // console.log(`-QTY TO BUY: ${qtyToBuy}`);
-            if ( (qtyToBuy < maxQtyToArbitrage) && (maxQtyToArbitrage < CONFIG.BITTREX.MAX_ETH_QUANTITY / ETH_X_ASK) ) {
+            if (qtyToBuy > maxQtyToArbitrage) {
                 qtyToBuy = maxQtyToArbitrage;
-            } else if ( (qtyToBuy < maxQtyToArbitrage) &&
-                        (maxQtyToArbitrage > CONFIG.BITTREX.MAX_ETH_QUANTITY / ETH_X_ASK) ) {
-                qtyToBuy = CONFIG.BITTREX.MAX_ETH_QUANTITY / ETH_X_ASK;
             }
             const qtyToSell: number = qtyToBuy;
             const ethQtyToBuy: number = (qtyToSell * USDT_X_BID) / USDT_ETH_ASK;
@@ -662,18 +677,14 @@ export default class TriangularArbitrageDetector extends EventEmitter {
             maxQtyToArbitrage = maxQtyToConvert < maxQtyToArbitrage ? maxQtyToConvert : maxQtyToArbitrage;
             // console.log(`-MAX QTY TO ARBITRAGE: ${maxQtyToArbitrage}`);
 
-            if (maxQtyToArbitrage < CONFIG.BITTREX.MIN_USDT_QUANTITY / USDT_X_ASK) {
-                return;
-            }
+            // if (maxQtyToArbitrage < CONFIG.BITTREX.MIN_USDT_QUANTITY / USDT_X_ASK) {
+            //     return;
+            // }
 
             let qtyToBuy: number = CONFIG.BITTREX.MAX_USDT_QUANTITY / USDT_X_ASK;
             // console.log(`-QTY TO BUY: ${qtyToBuy}`);
-            if ( (qtyToBuy < maxQtyToArbitrage) &&
-                 (maxQtyToArbitrage < CONFIG.BITTREX.MAX_USDT_QUANTITY / USDT_X_ASK) ) {
+            if (qtyToBuy > maxQtyToArbitrage) {
                 qtyToBuy = maxQtyToArbitrage;
-            } else if ( (qtyToBuy < maxQtyToArbitrage) &&
-                        (maxQtyToArbitrage > CONFIG.BITTREX.MAX_USDT_QUANTITY / USDT_X_ASK) ) {
-                qtyToBuy = CONFIG.BITTREX.MAX_USDT_QUANTITY / USDT_X_ASK;
             }
             const qtyToSell: number = qtyToBuy;
             const ethQuantityToSell: number = qtyToSell * ETH_X_BID;
@@ -715,18 +726,18 @@ export default class TriangularArbitrageDetector extends EventEmitter {
 
     private logEvents(): void {
         if (CONFIG.GLOBAL.IS_LOG_ACTIVE) {
-            // this.on(TriangularArbitrageDetector.ARBITRAGE_OPPORTUNITY_EVENT,
-            //         (triangularArbitrage: TriangularArbitrage) => {
-            //         console.log(`\n--- TRIANGULAR ARBITRAGE [${triangularArbitrage.buyQuote.marketName}] -> ` +
-            //                                                 `[${triangularArbitrage.sellQuote.marketName}] -> ` +
-            //                                                 `[${triangularArbitrage.convertQuote.marketName}] ---  \n` +
-            //                     `GAP: ${triangularArbitrage.gapPercentage}% \nMAX QTY: ${triangularArbitrage.maxQtyToArbitrage} \n` +
-            //                     `TRADE QTY: ${triangularArbitrage.buyQuote.quantity * triangularArbitrage.buyQuote.rate} \n`);
-            //         // TEST
-            //         // console.log(triangularArbitrage.buyQuote);
-            //         // console.log(triangularArbitrage.sellQuote);
-            //         // console.log(triangularArbitrage.convertQuote);
-            // });
+            this.on(TriangularArbitrageDetector.ARBITRAGE_OPPORTUNITY_EVENT,
+                    (triangularArbitrage: TriangularArbitrage) => {
+                    console.log(`\n--- TRIANGULAR ARBITRAGE [${triangularArbitrage.buyQuote.marketName}] -> ` +
+                                                            `[${triangularArbitrage.sellQuote.marketName}] -> ` +
+                                                            `[${triangularArbitrage.convertQuote.marketName}] ---  \n` +
+                                `GAP: ${triangularArbitrage.gapPercentage}% \nMAX QTY: ${triangularArbitrage.maxQtyToArbitrage} \n` +
+                                `TRADE QTY: ${triangularArbitrage.buyQuote.quantity * triangularArbitrage.buyQuote.rate} \n`);
+                    // TEST
+                    // console.log(triangularArbitrage.buyQuote);
+                    // console.log(triangularArbitrage.sellQuote);
+                    // console.log(triangularArbitrage.convertQuote);
+            });
         }
     }
 
