@@ -12,7 +12,9 @@ import IAccountManager from "../Services/IAccountManager";
 
 import OpenOrdersStatusDetector from "../MarketEventDetectors/OpenOrdersStatusDetector";
 import TriangularArbitrageDetector from "../MarketEventDetectors/TriangularArbitrageDetector";
+import TriangularArbitrageDetectorTick from "../MarketEventDetectors/TriangularArbitrageDetectorTick";
 import UnfilleddOrdersDetector from "../MarketEventDetectors/UnfilledOrdersDetector";
+
 import TriangularArbitrageHandler from "../MarketEventHandlers/TriangularArbitrageHandler";
 import UnfilledOrderHandler from "../MarketEventHandlers/UnfilledOrderHandler";
 
@@ -31,6 +33,7 @@ export default class BittrexTriangularArbitrageBot {
 
     private openOrdersStatusDetector: OpenOrdersStatusDetector;
     private triangularArbitrageDetector: TriangularArbitrageDetector;
+    private triangularArbitrageDetectorTick: TriangularArbitrageDetectorTick;
     private unfilledOrdersDetector: UnfilleddOrdersDetector;
 
     private triangularArbitrageHandler: TriangularArbitrageHandler;
@@ -61,10 +64,15 @@ export default class BittrexTriangularArbitrageBot {
         this.openOrdersStatusDetector = new OpenOrdersStatusDetector(this.broker);
         this.triangularArbitrageDetector = new TriangularArbitrageDetector
             (this.broker, this.accountManager, this.openOrdersStatusDetector, this.tickEmitter, this.orderBookEmitter);
-        // this.unfilledOrdersDetector = new UnfilleddOrdersDetector(this.broker, this.openOrdersStatusDetector);
+        // this.triangularArbitrageDetectorTick = new TriangularArbitrageDetectorTick
+        //     (this.broker, this.accountManager, this.openOrdersStatusDetector, this.tickEmitter, this.orderBookEmitter);
 
-        this.triangularArbitrageHandler = new TriangularArbitrageHandler
-                                    (this.triangularArbitrageDetector, this.openOrdersStatusDetector, this.broker);
+        this.unfilledOrdersDetector = new UnfilleddOrdersDetector(this.broker, this.openOrdersStatusDetector);
+
+        // this.triangularArbitrageHandler = new TriangularArbitrageHandler
+        //                             (this.triangularArbitrageDetector, this.openOrdersStatusDetector, this.broker);
+        // this.triangularArbitrageHandler = new TriangularArbitrageHandler
+        //                             (this.triangularArbitrageDetectorTick, this.openOrdersStatusDetector, this.broker);
         // this.unfilledOrderHandler = new UnfilledOrderHandler
         //                     (this.unfilledOrdersDetector, this.openOrdersStatusDetector, this.broker, this.tickEmitter);
 
@@ -94,7 +102,7 @@ export default class BittrexTriangularArbitrageBot {
             }
 
             // 3 triangles at a time max
-            if (TriangularArbitrageHandler.currentlyOpenedTriangles.size > 3) {
+            if (TriangularArbitrageHandler.currentlyOpenedTriangles.size >= 1) {
                 return;
             }
 

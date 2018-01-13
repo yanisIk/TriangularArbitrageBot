@@ -6,7 +6,7 @@ import Order from "../Models/Order";
 import * as CONFIG from "./../Config/CONFIG";
 import IAccountManager from "./IAccountManager";
 
-const bittrexClient = require("../../CustomExchangeClients/node-bittrex-api");
+const bittrexClient = require("node-bittrex-api");
 const bittrex = Bluebird.promisifyAll(bittrexClient);
 bittrex.options({
     apikey : process.env.BITTREX_API_KEY,

@@ -1,18 +1,13 @@
-declare const CONFIG: any;
+import * as CONFIG from "../Config/CONFIG";
+
 import { EventEmitter } from "events";
 import IBroker from "../Brokers/IBroker";
 import OpenOrdersStatusDetector, { UPDATE_ORDER_STATUS_EVENTS } from "../MarketEventDetectors/OpenOrdersStatusDetector";
 import TriangularArbitrageDetector from "../MarketEventDetectors/TriangularArbitrageDetector";
+import TriangularArbitrageDetectorTick from "../MarketEventDetectors/TriangularArbitrageDetectorTick";
 import Order, { OrderSide, OrderStatus, OrderTimeEffect, OrderType } from "../Models/Order";
 import Quote from "../Models/Quote";
 import TriangularArbitrage from "../Models/TriangularArbitrage";
-
-/**
- * - Subscribe to sell filled events
- * - check if filled
- * - outbid with quantity sold
- * - ! WAIT FOR COMPLETELY FILLED TO RE OUTBID, OTHERWISE I WILL OUTBID MYSELF WITH MY PARTIAL SELL FILLS !
- */
 
 export default class TriangularArbitrageHandler extends EventEmitter {
 
@@ -22,7 +17,7 @@ export default class TriangularArbitrageHandler extends EventEmitter {
     public static readonly OPEN_TRIANGLE_EVENT: string = "OPENED_TRIANGLE";
     public static readonly CLOSE_TRIANGLE_EVENT: string = "CLOSED_TRIANGLE";
 
-    constructor(private triangularTriangularArbitrageDetector: TriangularArbitrageDetector,
+    constructor(private triangularTriangularArbitrageDetector: TriangularArbitrageDetector | TriangularArbitrageDetectorTick,
                 private openOrdersStatusDetector: OpenOrdersStatusDetector,
                 private broker: IBroker) {
         super();
@@ -128,6 +123,7 @@ export default class TriangularArbitrageHandler extends EventEmitter {
 
         triangularArbitrage.close(filledBuyOrder, filledSellOrder, filledConvertOrder);
 
+        // TODO: UNCOMMENT AFTER TEST
         TriangularArbitrageHandler.currentlyOpenedTriangles.delete(triangularArbitrage.triangle);
         this.emit(TriangularArbitrageHandler.CLOSE_TRIANGLE_EVENT, triangularArbitrage);
     }

@@ -5,7 +5,7 @@ import Tick from "../Models/Tick";
 import * as CONFIG from "./../Config/CONFIG";
 import ITickEventEmitter from "./ITickEventEmitter";
 
-const bittrexClient = require("../../CustomExchangeClients/node-bittrex-api");
+const bittrexClient = require("node-bittrex-api");
 const bittrex = Bluebird.promisifyAll(bittrexClient);
 bittrex.options({
     apikey : process.env.BITTREX_API_KEY,
@@ -46,6 +46,9 @@ export default class BittrexTickEventEmitter extends EventEmitter implements ITi
     public async getTicker(marketName: string): Promise<Tick> {
         const ticker = await bittrex.gettickerAsync({market: marketName});
         if (!ticker.success) {
+            throw new Error(ticker.message);
+        }
+        if (!ticker.result) {
             throw new Error(ticker.message);
         }
         return new Tick(marketName, ticker.result.Bid, ticker.result.Ask, ticker.result.Last);
