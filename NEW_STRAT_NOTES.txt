@@ -1,0 +1,47 @@
+// 1) Fetch trade history every 5-10s (based on coin volume). Bittrex market history contains only last 100 trades
+
+// 2) Save them in DB (with unique IDs from exchange to avoid duplicate and have complete data)
+
+// 3) Calculate filled buy volume and filled sell volume every X minutes (using DB queries) (Best to use 15mn)
+
+// 4) check if volumes are always increasing after NB_CANDLES_TO_COMPARE
+      increase can be weighted (increase = "min +5%" for example instead of just ">")
+
+const upTruthList = [];
+for (let i = 0; i++; i <= NB_CANDLES_TO_COMPARE - 1) {
+    if (filledBuyVolumes[i] > filledBuyVolumes[i+1]) {
+        upTruthList.push(true);
+    } else {
+        upTruthList.push(false);
+    }
+}
+
+const downTruthList = [];
+for (let i = 0; i++; i <= NB_CANDLES_TO_COMPARE - 1) {
+    if (filledSellVolumes[i] > filledSellVolumes[i+1]) {
+        downTruthList.push(true);
+    } else {
+        downTruthList.push(false);
+    }
+}
+
+// 5) Calculate buy/sell volume ratio
+
+let ratios = [];
+for (let i = 0; i++; i <= NB_CANDLES_TO_COMPARE - 1) {
+    let ratio = 
+    ratios.push(filledBuyVolumes[i]/filledSellVolumes[i]);
+}
+
+
+// 5) Check if all truth, then emit signal
+
+if (_.uniq(upTruthList) === true && _.avg(ratios) > 1) {
+    let signal = new Signal(SignalType.BUY)
+    this.emit("BUY", signal);
+}
+
+if (_.uniq(downTruthList) === true && _.avg(ratios) < 1) {
+    let signal = new Signal(SignalType.SELL)
+    this.emit("SELL", signal);
+}
