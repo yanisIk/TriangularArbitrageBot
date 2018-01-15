@@ -1,8 +1,10 @@
+const Readable = require('stream').Readable;
+const fs = require('fs');
 const request = require('request-promise');
 const _ = require('lodash');
 const moment = require('moment');
 
-const pairs = ["USDT-BTC"];
+const pairs = ["BTC-ETH"];
 
 async function detectWalls(pair) {
     const bidsBookPromise = request.get({url: `https://bittrex.com/api/v1.1/public/getorderbook?market=${pair}&type=buy`, json: true});
@@ -187,8 +189,8 @@ async function analyseHistory(pair) {
         let windowBuys = buys.filter(trade => moment.utc(trade.TimeStamp).diff(moment.utc(), 'minutes', true) >= (-range * i));
         let windowSells = sells.filter(trade => moment.utc(trade.TimeStamp).diff(moment.utc(), 'minutes', true) >= (-range * i));
         if ((windowBuys.length && windowSells.length)) {
-            let windowBuysVolume = windowBuys.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty);
-            let windowSellsVolume = windowSells.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty);
+            let windowBuysVolume = windowBuys.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty, 0);
+            let windowSellsVolume = windowSells.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty, 0);
             let windowBuySellRatio = windowBuysVolume / windowSellsVolume;
             
             console.log(`\nFROM ${(range*i).toFixed(3)} minutes ago TO NOW:`)
@@ -202,12 +204,68 @@ async function analyseHistory(pair) {
 
 }
 
+async function analysePastSeconds(pair, seconds = 15, outStream) {
+    const tradeHistoryPromise = request.get({url: `https://bittrex.com/api/v1.1/public/getmarkethistory?market=${pair}`, json: true});
+    const tickerPromise = request.get({url: `https://bittrex.com/api/v1.1/public/getticker?market=${pair}`, json: true});
+
+    let tradeHistory;
+    let ticker;
+    [tradeHistory, ticker] = (await Promise.all([tradeHistoryPromise, tickerPromise])).map(r => r.result);
+
+    let buys = tradeHistory.filter(trade => trade.OrderType === 'BUY');
+    let sells = tradeHistory.filter(trade => trade.OrderType === 'SELL');
+
+    let windowBuys = buys.filter(trade => moment.utc(trade.TimeStamp).diff(moment.utc(), 'seconds', true) >= (-seconds));
+    let windowSells = sells.filter(trade => moment.utc(trade.TimeStamp).diff(moment.utc(), 'seconds', true) >= (-seconds));
+    
+    let windowBuysVolume = windowBuys.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty, 0);
+    let windowSellsVolume = windowSells.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty, 0);
+    let windowBuySellRatio = windowBuysVolume / windowSellsVolume;
+    
+    // console.log('Buys/s :', Gauge((windowBuySellRatio/seconds).toFixed(3), 4, 4, 3, `${windowBuysVolume}/${windowSellsVolume} ${pair.split('-')[1]}`));
+    // console.log('Buy/Sell Volume Ratio:', Gauge(windowBuySellRatio, 4, 4, 3, `${windowBuysVolume}/${windowSellsVolume} ${pair.split('-')[1]}`));
+
+    // console.log(`\nFROM ${(seconds).toFixed(3)} seconds ago TO NOW:`)
+    // console.log(`----- ${windowBuys.length} BUY ORDERS FILLED (VOLUME: ${windowBuysVolume.toFixed(3)})`);
+    // console.log(`----- ${windowSells.length} SELL ORDERS FILLED (VOLUME: ${windowSellsVolume.toFixed(3)})`);
+    // console.log(`----- BUY/SELL RATIO = ${windowBuySellRatio.toFixed(3)}`);
+
+    outStream.push(JSON.stringify({timestamp: Date.now(),
+                            bid: ticker.Bid, ask: ticker.Ask, last: ticker.Last,
+                            buyVolume: windowBuysVolume, sellVolume: windowSellsVolume,
+                            buySellVolumeRatio: windowBuySellRatio}));
+
+    // console.log(`\nBUY/SELL RATIO = ${windowBuySellRatio.toFixed(3)}`);
+    // console.log(`BUYS/s = ${(windowBuysVolume/seconds)}`);
+    // console.log(`SELLS/s = ${(windowSellsVolume/seconds)}`);
+
+    
+    
+}
+
+async function saveToCsv(inStream, fileName) {
+    const JSONToCSVStream = require('json2csv-stream');
+    const json2csvStreamParser = new JSONToCSVStream();
+    const fileWriteStream = fs.createWriteStream(fileName);
+
+    inStream.pipe(json2csvStreamParser).pipe(fileWriteStream);
+
+}
+
 pairs.forEach(async pair => {
     try {
-        await detectWalls(pair);
-        await analyseHistory(pair);
+        // await detectWalls(pair);
+        // await analyseHistory(pair);
+        const dataStream = new Readable();
+        dataStream._read = function () {};
+        setInterval(async () => {
+            await analysePastSeconds(pair, 60, dataStream);
+        }, 2000);
+        saveToCsv(dataStream, `${pair}_orders_data_history.csv`);
+
     } catch (err) {
         console.error(err);
     }
+    
 });
 

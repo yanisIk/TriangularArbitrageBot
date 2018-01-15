@@ -22,8 +22,11 @@
   "dependencies": {
     "async": "^2.6.0",
     "bluebird": "^3.5.1",
+    "cliui": "^4.0.0",
+    "clui": "^0.3.6",
     "cluster": "^0.7.7",
     "dotenv-safe": "^4.0.4",
+    "json2csv-stream": "^0.1.4",
     "lodash": "^4.17.4",
     "moment": "^2.20.1",
     "node-bittrex-api": "^0.8.1",
