@@ -4,44 +4,124 @@
 
 // 3) Calculate filled buy volume and filled sell volume every X minutes (using DB queries) (Best to use 15mn)
 
-// 4) check if volumes are always increasing after NB_CANDLES_TO_COMPARE
+// 4) Check if volumes are always increasing after NB_CANDLES_TO_COMPARE
       increase can be weighted (increase = "min +5%" for example instead of just ">")
 
-const upTruthList = [];
-for (let i = 0; i++; i <= NB_CANDLES_TO_COMPARE - 1) {
-    if (filledBuyVolumes[i] > filledBuyVolumes[i+1]) {
-        upTruthList.push(true);
-    } else {
-        upTruthList.push(false);
+    const upTruthList = [];
+    for (let i = 0; i++; i <= NB_CANDLES_TO_COMPARE - 1) {
+        if (filledBuyVolumes[i] > filledBuyVolumes[i+1]) {
+            upTruthList.push(true);
+        } else {
+            upTruthList.push(false);
+        }
     }
-}
 
-const downTruthList = [];
-for (let i = 0; i++; i <= NB_CANDLES_TO_COMPARE - 1) {
-    if (filledSellVolumes[i] > filledSellVolumes[i+1]) {
-        downTruthList.push(true);
-    } else {
-        downTruthList.push(false);
+    const downTruthList = [];
+    for (let i = 0; i++; i <= NB_CANDLES_TO_COMPARE - 1) {
+        if (filledSellVolumes[i] > filledSellVolumes[i+1]) {
+            downTruthList.push(true);
+        } else {
+            downTruthList.push(false);
+        }
     }
-}
 
-// 5) Calculate buy/sell volume ratio
+// 5) BUY/SELL RATIO: Calculate buy/sell volume ratio
 
-let ratios = [];
-for (let i = 0; i++; i <= NB_CANDLES_TO_COMPARE - 1) {
-    let ratio = 
-    ratios.push(filledBuyVolumes[i]/filledSellVolumes[i]);
-}
+    let ratios = [];
+    for (let i = 0; i++; i <= NB_CANDLES_TO_COMPARE - 1) {
+        const ratio = filledBuyVolumes[i] / filledSellVolumes[i];
+        ratios.push(ratio);
+    }
+
+// 6) STOP LOSS/TAKE PROFIT: Find neared BUY/SELL WALLS to use them as STOP LOSS/TAKE PROFIT
+
+    // - Get order book
+    // - loop over bids until bid = -3% and over asks until ask = +3%
+         
+         let bidDiff = 0;
+         let bidIndex = 1;
+         while (bidDiff > -3) {
+             bidDiff = ((book.bids[bidIndex].rate - book.bids[0].rate) / book.bids[0].rate) * 100;
+             bidIndex++;
+         }
+
+         let askDiff = 0;
+         let askIndex = 1;
+         while (askDiff < 3) {
+             askDiff = ((book.asks[askIndex].rate - book.asks[0].rate) / book.asks[0].rate) * 100;
+             askIndex++;
+         }
+
+    // - Find walls
+        const bids = book.bids.splice(0, bidIndex);
+        const asks = book.asks.splice(0, askIndex);
+
+        // Group by close values (for example [ [15000-15001-15002], [15010-15011-15012] ])
+        // Called Group By Bins in data science
+
+        const bidBins = [];
+        let currentBin = [bids[0]]; 
+        for (let i=1; i <= bids.length; i++) {
+            let prevDiff = Math.abs( ( (bids[i].rate - bids[i-1].rate) / bids[i-1].rate ) * 100 );
+            if (prevDiff <= 0.05) {
+                currentBin.push(bids[i]);
+            } else {
+                bidBins.push(currentBin);
+                currentBin = [bids[i]];
+            }
+        }
+
+        const askBins = [];
+        let currentBin = [asks[0]]; 
+        for (let i=1; i <= asks.length; i++) {
+            let prevDiff = Math.abs( ( (asks[i].rate - asks[i-1].rate) / asks[i-1].rate ) * 100 );
+            if (prevDiff <= 0.05) {
+                currentBin.push(asks[i]);
+            } else {
+                sortedBidBins.push(currentBin);
+                currentBin = [asks[i]];
+            }
+        }
+
+        // Flatten the bins (with rate = rate of first one)
+        const groupedBids = bidBins.map((bidBin) => {
+                                    return {
+                                        rate: bidBin[0].rate;
+                                        quantity: bidBin.map((bid) => bid.quantity).reduce((totalQty, qty) => totalQty + qty);
+                                    }
+                                  });
+        const groupedAsks = askBins.map((askBin) => {
+                                    return {
+                                        rate: askBin[0].rate;
+                                        quantity: askBin.map((ask) => ask.quantity).reduce((totalQty, qty) => totalQty + qty);
+                                    }
+                                  });
+
+        // Sort by quantity
+        const sortedGroupedBids = _.sortBy(groupedBids, 'quantity');
+        const sortedGroupedAsks = _.sortBy(groupedAsks, 'quantity');
+
+        const buyWall = sortedGroupedBids[0];
+        const sellWall = sortedGroupedAsks[0];
+
+    // - Check distance of walls from bid/ask in percentage
+        let buyWallDistance = Math.abs( ( (buyWall.rate - bids[0].rate) / bids[0].rate ) * 100 );
+        let sellWallDistance = Math.abs( ( (sellWall.rate - asks[0].rate) / asks[0].rate ) * 100 );
+        
 
 
-// 5) Check if all truth, then emit signal
+// 7) GASP: Global Avg Symmetric Price: calculate it using the bins for more accurage result
 
-if (_.uniq(upTruthList) === true && _.avg(ratios) > 1) {
-    let signal = new Signal(SignalType.BUY)
-    this.emit("BUY", signal);
-}
 
-if (_.uniq(downTruthList) === true && _.avg(ratios) < 1) {
-    let signal = new Signal(SignalType.SELL)
-    this.emit("SELL", signal);
-}
+// 8) EMIT SIGNAL: Check if all truth and if ratio is on the "right" side, then emit signal
+
+    if (_.uniq(upTruthList) === true && _.avg(ratios) > 1 && (gasp > midPrice) ) {
+        let signal = new Signal(SignalType.BUY)
+        this.emit("BUY", signal);
+    }
+
+    if (_.uniq(downTruthList) === true && _.avg(ratios) < 1) && (gasp < midPrice)) {
+        let signal = new Signal(SignalType.SELL)
+        this.emit("SELL", signal);
+    }
+
