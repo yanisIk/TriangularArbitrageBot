@@ -4,7 +4,7 @@ const request = require('request-promise');
 const _ = require('lodash');
 const moment = require('moment');
 
-const pairs = ["BTC-ETH"];
+const pairs = ["USDT-BTC"];
 
 async function detectWalls(pair) {
     const bidsBookPromise = request.get({url: `https://bittrex.com/api/v1.1/public/getorderbook?market=${pair}&type=buy`, json: true});
@@ -222,22 +222,17 @@ async function analysePastSeconds(pair, seconds = 15, outStream) {
     let windowSellsVolume = windowSells.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty, 0);
     let windowBuySellRatio = windowBuysVolume / windowSellsVolume;
     
-    // console.log('Buys/s :', Gauge((windowBuySellRatio/seconds).toFixed(3), 4, 4, 3, `${windowBuysVolume}/${windowSellsVolume} ${pair.split('-')[1]}`));
-    // console.log('Buy/Sell Volume Ratio:', Gauge(windowBuySellRatio, 4, 4, 3, `${windowBuysVolume}/${windowSellsVolume} ${pair.split('-')[1]}`));
-
-    // console.log(`\nFROM ${(seconds).toFixed(3)} seconds ago TO NOW:`)
-    // console.log(`----- ${windowBuys.length} BUY ORDERS FILLED (VOLUME: ${windowBuysVolume.toFixed(3)})`);
-    // console.log(`----- ${windowSells.length} SELL ORDERS FILLED (VOLUME: ${windowSellsVolume.toFixed(3)})`);
-    // console.log(`----- BUY/SELL RATIO = ${windowBuySellRatio.toFixed(3)}`);
-
     outStream.push(JSON.stringify({timestamp: Date.now(),
-                            bid: ticker.Bid, ask: ticker.Ask, last: ticker.Last,
-                            buyVolume: windowBuysVolume, sellVolume: windowSellsVolume,
-                            buySellVolumeRatio: windowBuySellRatio}));
+        bid: ticker.Bid, ask: ticker.Ask, last: ticker.Last,
+        buyVolume: windowBuysVolume, sellVolume: windowSellsVolume,
+        buySellVolumeRatio: windowBuySellRatio}));
 
-    // console.log(`\nBUY/SELL RATIO = ${windowBuySellRatio.toFixed(3)}`);
-    // console.log(`BUYS/s = ${(windowBuysVolume/seconds)}`);
-    // console.log(`SELLS/s = ${(windowSellsVolume/seconds)}`);
+    console.log(`\n\nFROM ${(seconds).toFixed(3)} seconds ago TO NOW:`)
+    console.log(`----- ${windowBuys.length} BUY ORDERS FILLED (VOLUME: ${windowBuysVolume.toFixed(3)})`);
+    console.log(`----- ${windowSells.length} SELL ORDERS FILLED (VOLUME: ${windowSellsVolume.toFixed(3)})`);
+    console.log(`BUY VOLUME/s = ${(windowBuysVolume/seconds)}`);
+    console.log(`SELL VOLUME/s = ${(windowSellsVolume/seconds)}`);
+    console.log(`BUY/SELL RATIO = ${windowBuySellRatio.toFixed(3)}`);
 
     
     
@@ -255,12 +250,12 @@ async function saveToCsv(inStream, fileName) {
 pairs.forEach(async pair => {
     try {
         // await detectWalls(pair);
-        // await analyseHistory(pair);
+        //await analyseHistory(pair);
         const dataStream = new Readable();
         dataStream._read = function () {};
         setInterval(async () => {
-            await analysePastSeconds(pair, 60, dataStream);
-        }, 2000);
+            await analysePastSeconds(pair, 90, dataStream);
+        }, 5000);
         saveToCsv(dataStream, `${pair}_orders_data_history.csv`);
 
     } catch (err) {
