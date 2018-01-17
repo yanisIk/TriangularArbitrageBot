@@ -1,0 +1,22 @@
+1) Get last month icos
+https://api.icowatchlist.com/public/v1/finished
+{
+            "name":"AppCoins",
+            "image":"https:\/\/icowatchlist.com\/logos\/appcoin.png",
+            "description":"AppCoins is the first cryptocurrency for app stores serving 200 million active users",
+            "website_link":"https:\/\/api.icowatchlist.com\/public\/v1\/url\/appcoin",
+            "icowatchlist_url":"https:\/\/icowatchlist.com\/ico\/appcoin",
+            "start_time":"2017-12-13 00:00:00",
+            "end_time":"2018-01-15 23:59:59",
+            "timezone":"UTC+0",
+            "coin_symbol":"APPC",
+            "price_usd":"1.54",
+            "all_time_roi":"685.71%"
+         }
+2) For each, check if already on exchanges (coinmarketcap)
+
+3) Validate project (fundamentals: team, whitepaper, social)
+
+4) For each, analyse price evolution (no pump and dump, steady growth)
+
+5)
