@@ -4,9 +4,30 @@ const request = require('request-promise');
 const _ = require('lodash');
 const moment = require('moment');
 
-const pairs = ["USDT-BTC"];
+async function getTicker(pair) {
+    return (await request.get({url: `https://bittrex.com/api/v1.1/public/getticker?market=${pair}`, json: true}))
+            .result;
+}
 
+async function getAllPairs() {
+    return (await request.get({url: `https://bittrex.com/api/v1.1/public/getmarketsummaries`, json: true}))
+            .result
+            .map(r => r.MarketName);
+}
+
+const MAX_BASE_VOLUME = 50;
+async function getAllLowVolumePairs() {
+    return (await request.get({url: `https://bittrex.com/api/v1.1/public/getmarketsummaries`, json: true}))
+            .result
+            .filter(r => r.BaseVolume <= MAX_BASE_VOLUME)
+            .sort((a, b) => b.BaseVolume - a.BaseVolume)
+            .map(r => r.MarketName);
+}
+
+const MAX_WALL_DISTANCE_PERCENTAGE = 5;
+const RATES_BIN_SIZE_PERCENTAGE = 0.05
 async function detectWalls(pair) {
+    
     const bidsBookPromise = request.get({url: `https://bittrex.com/api/v1.1/public/getorderbook?market=${pair}&type=buy`, json: true});
     const asksBookPromise = request.get({url: `https://bittrex.com/api/v1.1/public/getorderbook?market=${pair}&type=sell`, json: true});
     const book = {};
@@ -20,7 +41,7 @@ async function detectWalls(pair) {
     let bidDiff = 0;
     let bidIndex = 1;
     let stop = false;
-    while ((bidDiff > -3) && (stop != true)) {
+    while ((bidDiff > -MAX_WALL_DISTANCE_PERCENTAGE) && (stop != true)) {
         bidDiff = ((book.bids[bidIndex].Rate - book.bids[0].Rate) / book.bids[0].Rate) * 100;
         if (bidIndex === book.bids.length - 1) {
             stop = true;
@@ -32,7 +53,7 @@ async function detectWalls(pair) {
     let askDiff = 0;
     let askIndex = 1;
     stop = false;
-    while ((askDiff < 3) && (stop != true)) {
+    while ((askDiff < MAX_WALL_DISTANCE_PERCENTAGE) && (stop != true)) {
         askDiff = ((book.asks[askIndex].Rate - book.asks[0].Rate) / book.asks[0].Rate) * 100;
         if (askIndex === book.asks.length - 1) {
             stop = true;
@@ -56,12 +77,11 @@ async function detectWalls(pair) {
 
     // Group by close values (for example [ [15000-15001-15002], [15010-15011-15012] ])
     // Called Group By Bins in data science
-
     const bidBins = [];
     let currentBin = [bids[0]]; 
-    for (let i=1; i < bids.length; i++) {
+    for (let i=1; i < bids.length; ++i) {
         let prevDiff = Math.abs( ( (bids[i].Rate - bids[i-1].Rate) / bids[i-1].Rate ) * 100 );
-        if (prevDiff <= 0.05) {
+        if (prevDiff <= RATES_BIN_SIZE_PERCENTAGE) {
             currentBin.push(bids[i]);
         } else {
             bidBins.push(currentBin);
@@ -71,9 +91,9 @@ async function detectWalls(pair) {
 
     const askBins = [];
     currentBin = [asks[0]]; 
-    for (let i=1; i < asks.length; i++) {
+    for (let i=1; i < asks.length; ++i) {
         let prevDiff = Math.abs( ( (asks[i].Rate - asks[i-1].Rate) / asks[i-1].Rate ) * 100 );
-        if (prevDiff <= 0.05) {
+        if (prevDiff <= RATES_BIN_SIZE_PERCENTAGE) {
             currentBin.push(asks[i]);
         } else {
             askBins.push(currentBin);
@@ -139,26 +159,24 @@ async function detectWalls(pair) {
     });
 
     // Get biggest 5 walls sorted by distance
-    const bidWalls = sortedGroupedBids.slice(0, 2).sort((a, b) => {
+    let bidWalls = sortedGroupedBids.slice(0, 5).sort((a, b) => {
         return a.DistancePercentage - b.DistancePercentage;
     });
-    const askWalls = sortedGroupedAsks.slice(0, 2).sort((a, b) => {
+    let askWalls = sortedGroupedAsks.slice(0, 5).sort((a, b) => {
         return a.DistancePercentage - b.DistancePercentage;
     });
 
-
-    console.log(`\n------- [${pair}] BID: ${bids[0].Rate.toFixed(3)} - ASK: ${asks[0].Rate.toFixed(3)}`)
-
-    console.log(`\n------- BID WALLS:`);
-    bidWalls.forEach(wall => {
-        console.log(wall);
+    // Calculate quantity to reach each wall
+    bidWalls = bidWalls.map(w => {
+        w.QuantityDistance = bids.filter(bid => bid.Rate <= w.Rate).map(bid => bid.Quantity).reduce((a, b) => a + b, 0);
+        return w;
+    });
+    askWalls = askWalls.map(w => {
+        w.QuantityDistance = asks.filter(ask => ask.Rate <= w.Rate).map(ask => ask.Quantity).reduce((a, a) => a + b, 0);
+        return w;
     });
 
-    console.log(`\n------- ASK WALLS`);
-    askWalls.forEach(wall => {
-        console.log(wall);
-    });
-   // console.log(`\n------- ${sortedGroupedBids[0].Rate} (-${bidWallDistance.toFixed(3)}%) <---- ${bids[0].Rate.toFixed(3)} | ${asks[0].Rate.toFixed(3)} ----> ${sortedGroupedAsks[0].Rate} (+${askWallDistance.toFixed(3)}%)`);
+    return {bidWalls: bidWalls, askWalls: askWalls};
    
 }
 
@@ -166,40 +184,37 @@ async function analyseHistory(pair) {
     const tradeHistoryPromise = request.get({url: `https://bittrex.com/api/v1.1/public/getmarkethistory?market=${pair}`, json: true});
     const tradeHistory = (await tradeHistoryPromise).result;
 
-    let buys = tradeHistory.filter(trade => trade.OrderType === 'BUY');
-    let sells = tradeHistory.filter(trade => trade.OrderType === 'SELL');
-    let buysVolume = buys.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty);
-    let sellsVolume = sells.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty);
-    let buySellRatio = buysVolume / sellsVolume;
+    const buys = tradeHistory.filter(trade => trade.OrderType === 'BUY');
+    const sells = tradeHistory.filter(trade => trade.OrderType === 'SELL');
+    const buysVolume = buys.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty);
+    const sellsVolume = sells.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty);
+    const buySellRatio = buysVolume / sellsVolume;
 
-    console.log(`\nFROM ${moment.utc(buys[buys.length -1].TimeStamp).fromNow()}/${moment.utc(sells[sells.length -1].TimeStamp).fromNow()} (BUYS/SELLS) TO NOW:`)
-    console.log(`----- ${buys.length} BUY ORDERS FILLED (VOLUME: ${buysVolume.toFixed(3)})`);
-    console.log(`----- ${sells.length} SELL ORDERS FILLED (VOLUME: ${sellsVolume.toFixed(3)})`);
-    console.log(`----- BUY/SELL RATIO = ${buySellRatio.toFixed(3)}`);
+    return {buys: buys, sells: sells, buysVolume: buysVolume, sellsVolume: sellsVolume, buySellRatio: buySellRatio};
 
-    const maxBuyMinutes = moment.utc().diff(moment.utc(buys[buys.length -1].TimeStamp), 'minutes', true);
-    const maxSellMinutes = moment.utc().diff(moment.utc(sells[sells.length -1].TimeStamp), 'minutes', true);
-    const maxMinutes = maxBuyMinutes > maxSellMinutes ? maxSellMinutes : maxBuyMinutes;
-    const numberOfWindows = 10;
-    const range = maxMinutes / numberOfWindows;
+    // const maxBuyMinutes = moment.utc().diff(moment.utc(buys[buys.length -1].TimeStamp), 'minutes', true);
+    // const maxSellMinutes = moment.utc().diff(moment.utc(sells[sells.length -1].TimeStamp), 'minutes', true);
+    // const maxMinutes = maxBuyMinutes > maxSellMinutes ? maxSellMinutes : maxBuyMinutes;
+    // const numberOfWindows = 10;
+    // const range = maxMinutes / numberOfWindows;
 
-    // Calculate for each Xmn range
-    let i = 1;
-    while (i < numberOfWindows) {
-        let windowBuys = buys.filter(trade => moment.utc(trade.TimeStamp).diff(moment.utc(), 'minutes', true) >= (-range * i));
-        let windowSells = sells.filter(trade => moment.utc(trade.TimeStamp).diff(moment.utc(), 'minutes', true) >= (-range * i));
-        if ((windowBuys.length && windowSells.length)) {
-            let windowBuysVolume = windowBuys.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty, 0);
-            let windowSellsVolume = windowSells.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty, 0);
-            let windowBuySellRatio = windowBuysVolume / windowSellsVolume;
+    // // Calculate for each Xmn range
+    // let i = 1;
+    // while (i < numberOfWindows) {
+    //     let windowBuys = buys.filter(trade => moment.utc(trade.TimeStamp).diff(moment.utc(), 'minutes', true) >= (-range * i));
+    //     let windowSells = sells.filter(trade => moment.utc(trade.TimeStamp).diff(moment.utc(), 'minutes', true) >= (-range * i));
+    //     if ((windowBuys.length && windowSells.length)) {
+    //         let windowBuysVolume = windowBuys.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty, 0);
+    //         let windowSellsVolume = windowSells.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty, 0);
+    //         let windowBuySellRatio = windowBuysVolume / windowSellsVolume;
             
-            console.log(`\nFROM ${(range*i).toFixed(3)} minutes ago TO NOW:`)
-            console.log(`----- ${windowBuys.length} BUY ORDERS FILLED (VOLUME: ${windowBuysVolume.toFixed(3)})`);
-            console.log(`----- ${windowSells.length} SELL ORDERS FILLED (VOLUME: ${windowSellsVolume.toFixed(3)})`);
-            console.log(`----- BUY/SELL RATIO = ${windowBuySellRatio.toFixed(3)}`);
-        }
-        i++;
-    }
+    //         console.log(`\nFROM ${(range*i).toFixed(3)} minutes ago TO NOW:`)
+    //         console.log(`----- ${windowBuys.length} BUY ORDERS FILLED (VOLUME: ${windowBuysVolume.toFixed(3)})`);
+    //         console.log(`----- ${windowSells.length} SELL ORDERS FILLED (VOLUME: ${windowSellsVolume.toFixed(3)})`);
+    //         console.log(`----- BUY/SELL RATIO = ${windowBuySellRatio.toFixed(3)}`);
+    //     }
+    //     ++i;
+    // }
     
 
 }
@@ -247,20 +262,54 @@ async function saveToCsv(inStream, fileName) {
 
 }
 
-pairs.forEach(async pair => {
+async function start() {
     try {
-        // await detectWalls(pair);
-        //await analyseHistory(pair);
-        const dataStream = new Readable();
-        dataStream._read = function () {};
-        setInterval(async () => {
-            await analysePastSeconds(pair, 90, dataStream);
-        }, 5000);
-        saveToCsv(dataStream, `${pair}_orders_data_history.csv`);
+        const allLowVolumePairs = await getAllLowVolumePairs();
+        
+        allLowVolumePairs.slice(0, 2).forEach(async pair => {
+            console.log(`Analysing ${pair}`);
 
+            let ticker, walls, history;
+            [ticker, walls, history] = await Promise.all([getTicker(pair), detectWalls(pair), analyseHistory(pair)]);
+            
+            // TODO: FIX detectWalls(pair) error: SyntaxError: Duplicate parameter name not allowed in this context
+
+            console.log(`\n------- [${pair}] BID: ${ticker.Bid.toFixed(3)} - ASK: ${ticker.Ask.toFixed(3)}`)        
+    
+            console.log(`\nFROM ${moment.utc(history.buys[buys.length -1].TimeStamp).fromNow()}/${moment.utc(history.sells[sells.length -1].TimeStamp).fromNow()} (BUYS/SELLS) TO NOW:`)
+            console.log(`----- ${history.buys.length} BUY ORDERS FILLED (VOLUME: ${history.buysVolume.toFixed(3)})`);
+            console.log(`----- ${history.sells.length} SELL ORDERS FILLED (VOLUME: ${history.sellsVolume.toFixed(3)})`);
+            console.log(`----- BUY/SELL RATIO = ${history.buySellRatio.toFixed(3)}`);
+            
+            console.log(`\n------- BID WALLS:`);
+            walls.bidWalls.forEach(wall => {
+                console.log(wall);
+            });
+        
+            console.log(`\n------- ASK WALLS`);
+            walls.askWalls.forEach(wall => {
+                console.log(wall);
+            });
+            
+            // console.log(`\n------- ${sortedGroupedBids[0].Rate} (-${bidWallDistance.toFixed(3)}%) <---- ${bids[0].Rate.toFixed(3)} | ${asks[0].Rate.toFixed(3)} ----> ${sortedGroupedAsks[0].Rate} (+${askWallDistance.toFixed(3)}%)`);
+        
+            // const dataStream = new Readable();
+            // dataStream._read = function () {};
+            // setInterval(async () => {
+            //     await analysePastSeconds(pair, 90, dataStream);
+            // }, 5000);
+            // saveToCsv(dataStream, `${pair}_orders_data_history.csv`);
+        
+        });
     } catch (err) {
         console.error(err);
     }
-    
+}
+
+start();
+
+process.on('unhandledRejection', function(reason, p){
+    console.log("Possibly Unhandled Rejection at: Promise ", p, " reason: ", reason);
+    // application specific logging here
 });
 

@@ -1,0 +1,17 @@
+1) Detect fake support levels 
+    (the ones visible on graph but that have no real support in the orderbook)
+2) Send limit buy orders @ fake support level
+3) Wait for whale to come
+4) Sell at previous stable price
+5) Lambo
+
+
+--- SIMPLIFIED VERSION ---
+
+1- Detect thin order books on the buy side
+    (Which means easy to eat for a whale)
+    - Wall: {rate, priceDistance, qtyDistance}
+2- Place limit buy order at the buy wall
+3- Wait for a whale to come ? (what if it doesn't come)
+4- Sell at previous stable price
+5- Lambo
