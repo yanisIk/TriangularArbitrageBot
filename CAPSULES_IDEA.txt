@@ -1,0 +1,2 @@
+- Search capsule hotels
+- Enrich data with http://spatial.ai/api_explorer/neighborhood/

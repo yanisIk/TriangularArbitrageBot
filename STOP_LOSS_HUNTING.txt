@@ -9,9 +9,20 @@
 --- SIMPLIFIED VERSION ---
 
 1- Detect thin order books on the buy side
-    (Which means easy to eat for a whale)
+    (Which means easy to eat for a whale that wants to crash the price)
     - Wall: {rate, priceDistance, qtyDistance}
-2- Place limit buy order at the buy wall
+2- Place limit buy order at the first buy wall 
 3- Wait for a whale to come ? (what if it doesn't come)
 4- Sell at previous stable price
 5- Lambo
+
+Data:
+
+Use cryptocompare websocket api
+
+- Fetch realtime filled orders and process them in windows
+- save output of windows in db and emit them on ws (pubnub ?)
+
+IDEA:
+- Calculate ratio of: number of BTC to eat to drop price 1% => BTC/percent
+- Calculate it for each % drop: 1% => 1.2 BTC/percent, 2% 1.9 BTC/percent ... until it goes high too much (which means hit a wall) 
