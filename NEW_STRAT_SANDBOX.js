@@ -27,12 +27,12 @@ async function getAllLowVolumePairs() {
 const MAX_WALL_DISTANCE_PERCENTAGE = 5;
 const RATES_BIN_SIZE_PERCENTAGE = 0.05
 async function detectWalls(pair) {
-    
+
     const bidsBookPromise = request.get({url: `https://bittrex.com/api/v1.1/public/getorderbook?market=${pair}&type=buy`, json: true});
     const asksBookPromise = request.get({url: `https://bittrex.com/api/v1.1/public/getorderbook?market=${pair}&type=sell`, json: true});
     const book = {};
     [book.bids, book.asks] = (await Promise.all([bidsBookPromise, asksBookPromise])).map(b => b.result);
-
+    
     // console.log(`\n------ PAIR: ${pair}   BID: ${book.bids[0].Rate}    ASK: ${book.asks[0].Rate}`)
 
     // - Get order book
@@ -88,6 +88,7 @@ async function detectWalls(pair) {
             currentBin = [bids[i]];
         }
     }
+    
 
     const askBins = [];
     currentBin = [asks[0]]; 
@@ -130,6 +131,7 @@ async function detectWalls(pair) {
                                 }
                                 });
 
+
     // console.log(`\n------- GROUPED BID BINS: ${groupedBidBins.length} @ ${groupedBidBins[groupedBidBins.length - 1].Rate}`);
     // console.log(groupedBidBins);
     // console.log(`\n------- GROUPED ASK BINS: ${groupedAskBins.length} @ ${groupedAskBins[groupedAskBins.length - 1].Rate}`);
@@ -171,10 +173,11 @@ async function detectWalls(pair) {
         w.QuantityDistance = bids.filter(bid => bid.Rate <= w.Rate).map(bid => bid.Quantity).reduce((a, b) => a + b, 0);
         return w;
     });
+
     askWalls = askWalls.map(w => {
-        w.QuantityDistance = asks.filter(ask => ask.Rate <= w.Rate).map(ask => ask.Quantity).reduce((a, a) => a + b, 0);
+        w.QuantityDistance = asks.filter(ask => ask.Rate <= w.Rate).map(ask => ask.Quantity).reduce((a, b) => a + b, 0);
         return w;
-    });
+    }); 
 
     return {bidWalls: bidWalls, askWalls: askWalls};
    
@@ -192,29 +195,29 @@ async function analyseHistory(pair) {
 
     return {buys: buys, sells: sells, buysVolume: buysVolume, sellsVolume: sellsVolume, buySellRatio: buySellRatio};
 
-    // const maxBuyMinutes = moment.utc().diff(moment.utc(buys[buys.length -1].TimeStamp), 'minutes', true);
-    // const maxSellMinutes = moment.utc().diff(moment.utc(sells[sells.length -1].TimeStamp), 'minutes', true);
-    // const maxMinutes = maxBuyMinutes > maxSellMinutes ? maxSellMinutes : maxBuyMinutes;
-    // const numberOfWindows = 10;
-    // const range = maxMinutes / numberOfWindows;
+    const maxBuyMinutes = moment.utc().diff(moment.utc(buys[buys.length -1].TimeStamp), 'minutes', true);
+    const maxSellMinutes = moment.utc().diff(moment.utc(sells[sells.length -1].TimeStamp), 'minutes', true);
+    const maxMinutes = maxBuyMinutes > maxSellMinutes ? maxSellMinutes : maxBuyMinutes;
+    const numberOfWindows = 10;
+    const range = maxMinutes / numberOfWindows;
 
-    // // Calculate for each Xmn range
-    // let i = 1;
-    // while (i < numberOfWindows) {
-    //     let windowBuys = buys.filter(trade => moment.utc(trade.TimeStamp).diff(moment.utc(), 'minutes', true) >= (-range * i));
-    //     let windowSells = sells.filter(trade => moment.utc(trade.TimeStamp).diff(moment.utc(), 'minutes', true) >= (-range * i));
-    //     if ((windowBuys.length && windowSells.length)) {
-    //         let windowBuysVolume = windowBuys.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty, 0);
-    //         let windowSellsVolume = windowSells.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty, 0);
-    //         let windowBuySellRatio = windowBuysVolume / windowSellsVolume;
+    // Calculate for each Xmn range
+    let i = 1;
+    while (i < numberOfWindows) {
+        let windowBuys = buys.filter(trade => moment.utc(trade.TimeStamp).diff(moment.utc(), 'minutes', true) >= (-range * i));
+        let windowSells = sells.filter(trade => moment.utc(trade.TimeStamp).diff(moment.utc(), 'minutes', true) >= (-range * i));
+        if ((windowBuys.length && windowSells.length)) {
+            let windowBuysVolume = windowBuys.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty, 0);
+            let windowSellsVolume = windowSells.map(t => t.Quantity).reduce((totalQty, qty) => totalQty + qty, 0);
+            let windowBuySellRatio = windowBuysVolume / windowSellsVolume;
             
-    //         console.log(`\nFROM ${(range*i).toFixed(3)} minutes ago TO NOW:`)
-    //         console.log(`----- ${windowBuys.length} BUY ORDERS FILLED (VOLUME: ${windowBuysVolume.toFixed(3)})`);
-    //         console.log(`----- ${windowSells.length} SELL ORDERS FILLED (VOLUME: ${windowSellsVolume.toFixed(3)})`);
-    //         console.log(`----- BUY/SELL RATIO = ${windowBuySellRatio.toFixed(3)}`);
-    //     }
-    //     ++i;
-    // }
+            console.log(`\nFROM ${(range*i).toFixed(3)} minutes ago TO NOW:`)
+            console.log(`----- ${windowBuys.length} BUY ORDERS FILLED (VOLUME: ${windowBuysVolume.toFixed(3)})`);
+            console.log(`----- ${windowSells.length} SELL ORDERS FILLED (VOLUME: ${windowSellsVolume.toFixed(3)})`);
+            console.log(`----- BUY/SELL RATIO = ${windowBuySellRatio.toFixed(3)}`);
+        }
+        ++i;
+    }
     
 
 }
@@ -265,7 +268,6 @@ async function saveToCsv(inStream, fileName) {
 async function start() {
     try {
         const allLowVolumePairs = await getAllLowVolumePairs();
-        
         allLowVolumePairs.slice(0, 2).forEach(async pair => {
             console.log(`Analysing ${pair}`);
 
@@ -276,7 +278,7 @@ async function start() {
 
             console.log(`\n------- [${pair}] BID: ${ticker.Bid.toFixed(3)} - ASK: ${ticker.Ask.toFixed(3)}`)        
     
-            console.log(`\nFROM ${moment.utc(history.buys[buys.length -1].TimeStamp).fromNow()}/${moment.utc(history.sells[sells.length -1].TimeStamp).fromNow()} (BUYS/SELLS) TO NOW:`)
+            console.log(`\nFROM ${moment.utc(history.buys[history.buys.length -1].TimeStamp).fromNow()}/${moment.utc(history.sells[history.sells.length -1].TimeStamp).fromNow()} (BUYS/SELLS) TO NOW:`)
             console.log(`----- ${history.buys.length} BUY ORDERS FILLED (VOLUME: ${history.buysVolume.toFixed(3)})`);
             console.log(`----- ${history.sells.length} SELL ORDERS FILLED (VOLUME: ${history.sellsVolume.toFixed(3)})`);
             console.log(`----- BUY/SELL RATIO = ${history.buySellRatio.toFixed(3)}`);
