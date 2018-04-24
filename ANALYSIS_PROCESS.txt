@@ -21,3 +21,12 @@ Also look to whether they just suck at social/marketing and whether that is a de
 
 There are other things I look at regarding team and such but I feel like that is generally a case by case and subjective. 
 After I have determined all this I am looking for entry at support or at breakout to continue momentum
+
+Code: 
+- get coinmarketcap list of coins between 20M and 250M cap
+- get bittrex/binance list of coins
+- keep coins that are not on bittrex and binance
+- keep fresh coins (less than 6 months ?)
+- keep coins with some social media activity
+
+WARNING: a good counter example is SelfKey: big ICO, big social media, lot of hype => bad investment
